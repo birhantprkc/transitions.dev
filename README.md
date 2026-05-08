@@ -20,6 +20,16 @@ Live site: https://transitions.dev/
 
 Each card has a copy button that emits a self-contained CSS snippet: semantic CSS custom properties on `:root`, the transition rules namespaced under `t-*` classes, and a `@media (prefers-reduced-motion: reduce)` guard — so you can paste the snippet into any project and apply it to any component without pulling in demo-specific markup or sizing.
 
+## Use as an agent skill
+
+The same nine transitions are packaged as an installable agent skill so AI coding tools (Cursor, Claude Code, Codex, …) can apply them directly inside your project.
+
+```bash
+npx skills add Jakubantalik/transitions-dev
+```
+
+Source: [Jakubantalik/transitions-dev](https://github.com/Jakubantalik/transitions-dev). The skill is generated from `index.html` in this repo, so its snippets always match what the showcase site demonstrates.
+
 ## Files
 
 - `index.html` — main showcase page with all nine transitions and per-card "copy CSS" buttons.

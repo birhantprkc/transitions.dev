@@ -134,6 +134,77 @@
          sign changes the starting corner instantly. */
       --p9-dir-x: 0;
       --p9-dir-y: 1;
+
+      /* P10 — Success check (appear/disappear) */
+      --p10-opacity-dur: 550ms;
+      --p10-rotate-dur:  550ms;
+      --p10-rotate-from: 80deg;
+      /* Bob is a single Y rise from --p10-y-amount below rest up
+         to rest, using --p10-ease-bob to add overshoot via a
+         subtle-bounce cubic-bezier (the cubic itself produces the
+         "lands and settles" feel — no manual keyframe overshoot). */
+      --p10-bob-dur:    550ms;
+      --p10-y-amount:   40px;
+      --p10-blur-dur:    500ms;
+      --p10-blur-from:   10px;
+      --p10-path-dur:    550ms;
+      --p10-path-delay:  80ms;
+      --p10-out-dur:     500ms;
+      --p10-ease-out:    cubic-bezier(0.22, 1, 0.36, 1); /* exit + entry blur */
+      --p10-ease-opacity: cubic-bezier(0.22, 1, 0.36, 1);
+      --p10-ease-rotate:  cubic-bezier(0.22, 1, 0.36, 1);
+      --p10-ease-bob:     cubic-bezier(0.34, 1.35, 0.64, 1); /* subtle overshoot via the curve, not via keyframes */
+      --p10-ease-path:    cubic-bezier(0.22, 1, 0.36, 1); /* SVG check stroke-draw */
+
+      /* P11 — Avatar group hover spring.
+         Each neighbor at distance d from the hovered avatar lifts by
+         --p11-lift * pow(--p11-falloff, d). Falloff between 0 and 1
+         controls how quickly the spring effect drops off — 0 = only
+         the hovered avatar moves, 1 = every avatar moves the full
+         amount. The default ease is a subtle-overshoot bezier so
+         the lift "pops" a hair past --p11-lift before settling, and
+         the rest "pops" a hair past 0 on the way back — that tiny
+         overshoot is the spring read in the design. */
+      --p11-lift:    -4px;
+      --p11-dur:     320ms;
+      /* Direction-aware easing: lifting toward the hover state uses
+         a clean ease (no overshoot — feels intentional and locked
+         in), while returning to rest uses an overshoot ease so the
+         group "settles" with a gentle spring. JS swaps the
+         transition-timing-function per phase before each shift
+         write so a single transition-property handles both. */
+      --p11-ease-in:  cubic-bezier(0.22, 1, 0.36, 1);
+      --p11-ease-out: cubic-bezier(0.34, 3.85, 0.64, 1);
+      /* --p11-bounce drives the Y of the second cubic-bezier control
+         point on --p11-ease-out (the return-to-rest ease). The CP
+         "Bounce" knob rewrites --p11-ease-out via the template
+         `cubic-bezier(0.34, {bounce}, 0.64, 1)`:
+           1.0  → no overshoot (settles flat)
+           ~1.35 → subtle bounce
+           3.8+ → very pronounced overshoot on return. */
+      --p11-bounce:  3.85;
+      /* Scale applied to the avatar that is directly hovered. Set
+         to 1 to disable. Non-hovered avatars stay at their natural
+         size and only translate. */
+      --p11-scale:   1.05;
+      --p11-falloff: 0.45;
+
+      /* P12 — Input shake on error.
+         Four-phase translateX with a per-segment cubic-bezier so each
+         leg of the wobble matches the Figma curve exactly. Total dur
+         is 80 + 80 + 60 + 60 = 280ms. After the shake we hold the
+         error state for --p12-revert-hold then fade back to neutral
+         over --p12-revert-dur, so the demo self-resets without the
+         user needing to type. */
+      --p12-shake-distance:  6px;
+      --p12-shake-overshoot: 4px;
+      --p12-shake-dur-a:     80ms;
+      --p12-shake-dur-b:     60ms;
+      --p12-shake-ease:      cubic-bezier(0.22, 1, 0.36, 1);
+      --p12-error-border:    #e23014;
+      --p12-error-text:      #d62b11;
+      --p12-revert-hold:     3000ms;
+      --p12-revert-dur:      280ms;
     }
 
     * {
@@ -1077,6 +1148,274 @@
     }
 
     /* ============================================================ */
+    /* Prototype 10 — Success check appear / disappear              */
+    /* ============================================================ */
+    /* The entry is composed of five subtransitions running in
+       parallel; the exit deliberately uses only three of them so
+       the disappearance reads as a quick "fade away" rather than
+       a full reverse of the entrance.
+         Entry:  Vertical movement, Rotate, Opacity, Path draw, Blur
+         Exit:                              Opacity, Path draw, Blur
+
+       Skipping rotate and Y on exit keeps the icon visually
+       anchored while it dissolves — animating them backwards on a
+       short out-duration tends to read as a nervous flick.
+
+       Each subtransition targets a distinct CSS property so they
+       compose without overwriting one another. The exit fires only
+       when JS explicitly toggles from "in" → "out" via the
+       .is-exiting helper class — on a cold page load the element
+       is just at opacity: 0 with no animation. */
+    /* Geometry matches Figma node 358:786 exactly: 48×48 frame, the
+       circle is the SVG <circle> at 10% opacity of #35BA00 (the same
+       hex used by the check stroke). We let the SVG paint both the
+       circle and the check so the asset is a faithful 1:1 of the
+       Figma export — no separate CSS background. */
+    .p10-check {
+      width: 48px;
+      height: 48px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transform-origin: center;
+      opacity: 0;
+      will-change: transform, opacity, filter;
+    }
+    .p10-check svg {
+      width: 48px;
+      height: 48px;
+      display: block;
+      overflow: visible;
+    }
+    /* Path is drawn via stroke-dashoffset. Length ≈ 19.7 (computed
+       from the two segments of the Figma path); we use 20 with
+       round caps so a tiny overshoot is invisible. If you swap the
+       path, recompute with path.getTotalLength() and update both
+       stroke-dasharray and stroke-dashoffset. */
+    .p10-check svg path {
+      stroke-dasharray: 20;
+      stroke-dashoffset: 20;
+    }
+
+    .p10-check[data-state="in"] {
+      animation:
+        p10-fade   var(--p10-opacity-dur) var(--p10-ease-opacity) forwards,
+        p10-rotate var(--p10-rotate-dur)  var(--p10-ease-rotate)  forwards,
+        p10-blur   var(--p10-blur-dur)    var(--p10-ease-out)     forwards,
+        p10-bob    var(--p10-bob-dur)     var(--p10-ease-bob)     forwards;
+    }
+    .p10-check[data-state="in"] svg path {
+      animation: p10-draw var(--p10-path-dur) var(--p10-ease-path) var(--p10-path-delay, 0ms) forwards;
+    }
+
+    /* Exit runs only three subtransitions over a shared duration
+       (--p10-out-dur): fade, blur, and path-undraw. Rotate and Y
+       movement are intentionally omitted — see the section banner
+       above. The path-undraw runs on the inner <path> via the
+       descendant rule below. */
+    .p10-check.is-exiting {
+      animation:
+        p10-fade-out var(--p10-out-dur) var(--p10-ease-out) forwards,
+        p10-blur-out var(--p10-out-dur) var(--p10-ease-out) forwards;
+    }
+    .p10-check.is-exiting svg path {
+      animation: p10-draw-out var(--p10-out-dur) var(--p10-ease-out) forwards;
+    }
+
+    @keyframes p10-fade     { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes p10-fade-out { from { opacity: 1; } to { opacity: 0; } }
+    @keyframes p10-rotate   {
+      from { transform: rotate(var(--p10-rotate-from)); }
+      to   { transform: rotate(0deg); }
+    }
+    @keyframes p10-blur     {
+      from { filter: blur(var(--p10-blur-from)); }
+      to   { filter: blur(0); }
+    }
+    @keyframes p10-blur-out {
+      from { filter: blur(0); }
+      to   { filter: blur(var(--p10-blur-from)); }
+    }
+    /* Y bob entry — single rise from below up to rest. The
+       overshoot/settle feeling comes from --p10-ease-bob (a
+       cubic-bezier whose Y crosses 1 before easing back, e.g.
+       cubic-bezier(0.34, 1.35, 0.64, 1)) rather than from keyframe
+       stops, so there's only one segment to interpolate. There's
+       no matching p10-bob-out: the exit doesn't move the icon. */
+    @keyframes p10-bob {
+      from { translate: 0 var(--p10-y-amount); }
+      to   { translate: 0 0; }
+    }
+    @keyframes p10-draw {
+      to { stroke-dashoffset: 0; }
+    }
+    /* Path-undraw: runs the stroke back from drawn (0) to fully
+       hidden (20). The trailing edge of the stroke retracts as
+       the icon disappears, mirroring the entry draw. */
+    @keyframes p10-draw-out {
+      from { stroke-dashoffset: 0; }
+      to   { stroke-dashoffset: 20; }
+    }
+
+    /* ============================================================ */
+    /* Prototype 11 — Avatar group hover spring                     */
+    /* ============================================================ */
+    /* Each .p11-avatar reads two inline CSS variables that JS
+       writes on mouseenter / mouseleave of any sibling:
+         --p11-shift         per-avatar Y translation (px)
+         --p11-scale-active  scale applied to the hovered avatar
+                             only (1 for everyone else)
+       The transition fires when either variable changes; JS swaps
+       transition-timing-function inline before each phase so the
+       lift uses --p11-ease-in (clean) and the return uses
+       --p11-ease-out (bouncy). Distance falloff is computed in JS
+       (CSS pow() exists but reading --p11-falloff from JS is
+       simpler and survives CP tweaks without a recalc). */
+    .p11-avatars {
+      display: flex;
+      align-items: center;
+    }
+    .p11-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1.5px solid #ffffff;
+      margin-right: -8px;
+      flex-shrink: 0;
+      overflow: hidden;
+      background: #eeeeef;
+      position: relative;
+      cursor: pointer;
+      transform-origin: center;
+      /* translateY first so scale doesn't amplify the lift offset.
+         --p11-scale-active is set per-element by JS: var(--p11-scale)
+         on the hovered avatar, 1 on everyone else. */
+      transform:
+        translateY(var(--p11-shift, 0px))
+        scale(var(--p11-scale-active, 1));
+      /* Default to ease-in so a CSS-only fallback (no JS) still
+         produces a clean lift. JS overwrites timing-function on
+         mouseleave to switch to ease-out for the bouncy return. */
+      transition: transform var(--p11-dur) var(--p11-ease-in);
+      will-change: transform;
+    }
+    .p11-avatar:last-child {
+      margin-right: 0;
+    }
+    .p11-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      pointer-events: none;
+    }
+    .p11-avatar-more {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-sans);
+      font-weight: 500;
+      font-size: 12px;
+      color: #17181c;
+      cursor: default;
+    }
+
+    /* ============================================================ */
+    /* Prototype 12 — Input field shake on error                    */
+    /* ============================================================ */
+    .p12-input-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      width: 232px;
+    }
+    .p12-input {
+      display: flex;
+      align-items: center;
+      height: 36px;
+      padding: 4px 4px 4px 12px;
+      border-radius: 8px;
+      border: 1px solid #909090;
+      background: var(--modal-bg, #ffffff);
+      outline: none;
+      transition:
+        border-color 150ms ease-out;
+      will-change: transform;
+    }
+    .p12-input:focus-within {
+      border-color: #585858;
+      outline: none;
+    }
+    .p12-input.is-error {
+      border-color: var(--p12-error-border);
+      outline: none;
+      transition: border-color var(--p12-revert-dur, 280ms) ease-out;
+    }
+    .p12-input-el {
+      flex: 1 0 0;
+      min-width: 0;
+      height: 100%;
+      border: 0;
+      outline: none;
+      background: transparent;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      line-height: 1.4;
+      color: #0f0f0f;
+      padding: 0;
+    }
+    .p12-input-el::placeholder {
+      color: #6b7280;
+    }
+    .p12-input-el:focus,
+    .p12-input-el:focus-visible {
+      outline: none;
+    }
+    /* Visibility transitions with a delay equal to the opacity
+       fade so it stays "visible" for the duration of the fade-out
+       (otherwise visibility would flip instantly and we'd never see
+       the message disappear smoothly). When entering the error
+       state we override the delay to 0 so the message becomes
+       visible immediately and only opacity animates. */
+    .p12-error-msg {
+      font-family: var(--font-sans);
+      font-size: 13px;
+      line-height: 1.4;
+      color: var(--p12-error-text);
+      margin: 0;
+      opacity: 0;
+      visibility: hidden;
+      transition:
+        opacity    var(--p12-revert-dur, 280ms) ease-out,
+        visibility 0s linear var(--p12-revert-dur, 280ms);
+    }
+    .p12-input-wrap.is-error .p12-error-msg {
+      opacity: 1;
+      visibility: visible;
+      transition:
+        opacity    var(--p12-revert-dur, 280ms) ease-out,
+        visibility 0s linear 0s;
+    }
+
+    /* Per-segment ease via animation-timing-function on each stop,
+       so each leg of the shake follows the Figma cubic-bezier curve
+       independently. The %-stops are the cumulative durations as a
+       fraction of the total (80, 160, 220, 280): 28.57%, 57.14%,
+       78.57%, 100%. Recompute if any segment duration changes. */
+    .p12-input.is-shaking {
+      animation: p12-shake calc(
+          var(--p12-shake-dur-a) * 2 + var(--p12-shake-dur-b) * 2
+        ) linear;
+    }
+    @keyframes p12-shake {
+      0%      { transform: translateX(0);                                 animation-timing-function: var(--p12-shake-ease); }
+      28.57%  { transform: translateX(var(--p12-shake-distance));         animation-timing-function: var(--p12-shake-ease); }
+      57.14%  { transform: translateX(calc(var(--p12-shake-distance) * -1)); animation-timing-function: var(--p12-shake-ease); }
+      78.57%  { transform: translateX(var(--p12-shake-overshoot));        animation-timing-function: var(--p12-shake-ease); }
+      100%    { transform: translateX(0); }
+    }
+
+    /* ============================================================ */
     /* Control panel                                                 */
     /* ============================================================ */
     body {
@@ -1306,9 +1645,15 @@
       .bell-badge-inner,
       .p5-icon-wrap .icon,
       .p6-text,
-      .p9-char {
+      .p9-char,
+      .p10-check,
+      .p11-avatar,
+      .p12-input {
         transform: none !important;
         filter: none !important;
+      }
+      .p10-check svg path {
+        stroke-dashoffset: 0 !important;
       }
     }
   </style>
@@ -1528,6 +1873,79 @@
         <button class="btn" data-proto="5">Animate</button>
       </div>
     </section>
+
+    <!-- ================================================== -->
+    <!-- 10. Success check appear / disappear                -->
+    <!-- ================================================== -->
+    <section class="proto-card">
+      <p class="proto-label">10.pototype</p>
+      <div class="stage">
+        <div class="p10-check" id="p10-check" data-state="out" aria-hidden="true">
+          <!-- 1:1 export of Figma node 358:786 (Group 41185).
+               Circle + check share the same #35BA00 hue; circle uses
+               fill-opacity 0.1 for the soft tint, path is drawn over
+               it via stroke-dashoffset. -->
+          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="24" cy="24" r="24" fill="#35BA00" fill-opacity="0.1"/>
+            <path d="M17.2803 24.9602L21.7603 29.7602L30.7203 20.1602"
+                  stroke="#35BA00"
+                  stroke-width="3"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <button class="btn" data-proto="10">Animate</button>
+      </div>
+    </section>
+
+    <!-- ================================================== -->
+    <!-- 11. Avatar group hover spring                       -->
+    <!-- ================================================== -->
+    <section class="proto-card">
+      <p class="proto-label">11.pototype</p>
+      <div class="stage">
+        <div class="p11-avatars" id="p11-avatars">
+          <div class="p11-avatar" data-index="0">
+            <img src="https://i.pravatar.cc/64?u=p11-1" alt="" loading="lazy">
+          </div>
+          <div class="p11-avatar" data-index="1">
+            <img src="https://i.pravatar.cc/64?u=p11-2" alt="" loading="lazy">
+          </div>
+          <div class="p11-avatar" data-index="2">
+            <img src="https://i.pravatar.cc/64?u=p11-3" alt="" loading="lazy">
+          </div>
+          <div class="p11-avatar" data-index="3">
+            <img src="https://i.pravatar.cc/64?u=p11-4" alt="" loading="lazy">
+          </div>
+          <div class="p11-avatar" data-index="4">
+            <img src="https://i.pravatar.cc/64?u=p11-5" alt="" loading="lazy">
+          </div>
+          <div class="p11-avatar" data-index="5">
+            <img src="https://i.pravatar.cc/64?u=p11-6" alt="" loading="lazy">
+          </div>
+          <div class="p11-avatar p11-avatar-more" data-index="6">+2</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================== -->
+    <!-- 12. Input field shake on error                      -->
+    <!-- ================================================== -->
+    <section class="proto-card">
+      <p class="proto-label">12.pototype</p>
+      <div class="stage">
+        <div class="p12-input-wrap" id="p12-wrap">
+          <div class="p12-input">
+            <input class="p12-input-el" id="p12-input"
+                   type="text" value="John"
+                   spellcheck="false" autocomplete="off"
+                   aria-label="Name">
+          </div>
+          <p class="p12-error-msg">Please enter a valid email.</p>
+        </div>
+        <button class="btn" data-proto="12">Animate</button>
+      </div>
+    </section>
   </main>
 
   <!-- ================================================== -->
@@ -1698,6 +2116,64 @@
         <div class="cp-row-ease-raw"><input type="text" class="cp-ease-text" data-var="--p5-ease" spellcheck="false" aria-label="Ease value"></div>
       </section>
 
+      <section class="cp-section">
+        <header class="cp-section-head">
+          <span class="cp-section-title">10. Success check</span>
+          <button type="button" class="cp-export">Export</button>
+        </header>
+        <div class="cp-row"><span class="cp-label">Opacity (ms)</span><input type="number" data-var="--p10-opacity-dur" data-unit="ms" min="0" max="2000" step="10" value="550"></div>
+        <div class="cp-row"><span class="cp-label">Rotate (ms)</span><input type="number" data-var="--p10-rotate-dur" data-unit="ms" min="0" max="2000" step="10" value="550"></div>
+        <div class="cp-row"><span class="cp-label">Rotate from (deg)</span><input type="number" data-var="--p10-rotate-from" data-unit="deg" min="-180" max="180" step="1" value="80"></div>
+        <div class="cp-row"><span class="cp-label">Y bob (ms)</span><input type="number" data-var="--p10-bob-dur" data-unit="ms" min="0" max="2000" step="10" value="550"></div>
+        <div class="cp-row"><span class="cp-label">Y amount (px)</span><input type="number" data-var="--p10-y-amount" data-unit="px" min="0" max="80" step="0.5" value="40"></div>
+        <div class="cp-row"><span class="cp-label">Blur (ms)</span><input type="number" data-var="--p10-blur-dur" data-unit="ms" min="0" max="2000" step="10" value="500"></div>
+        <div class="cp-row"><span class="cp-label">Blur from (px)</span><input type="number" data-var="--p10-blur-from" data-unit="px" min="0" max="80" step="1" value="10"></div>
+        <div class="cp-row"><span class="cp-label">Path (ms)</span><input type="number" data-var="--p10-path-dur" data-unit="ms" min="0" max="2000" step="10" value="550"></div>
+        <div class="cp-row"><span class="cp-label">Path delay (ms)</span><input type="number" data-var="--p10-path-delay" data-unit="ms" min="0" max="1000" step="10" value="80"></div>
+        <div class="cp-row"><span class="cp-label">Out (ms)</span><input type="number" data-var="--p10-out-dur" data-unit="ms" min="0" max="2000" step="10" value="500"></div>
+        <div class="cp-row"><span class="cp-label">Out ease</span><select class="cp-ease" data-var="--p10-ease-out"></select></div>
+        <div class="cp-row-ease-raw"><input type="text" class="cp-ease-text" data-var="--p10-ease-out" spellcheck="false" aria-label="Out ease value"></div>
+        <div class="cp-row"><span class="cp-label">Opacity ease</span><select class="cp-ease" data-var="--p10-ease-opacity"></select></div>
+        <div class="cp-row-ease-raw"><input type="text" class="cp-ease-text" data-var="--p10-ease-opacity" spellcheck="false" aria-label="Opacity ease value"></div>
+        <div class="cp-row"><span class="cp-label">Rotate ease</span><select class="cp-ease" data-var="--p10-ease-rotate"></select></div>
+        <div class="cp-row-ease-raw"><input type="text" class="cp-ease-text" data-var="--p10-ease-rotate" spellcheck="false" aria-label="Rotate ease value"></div>
+        <div class="cp-row"><span class="cp-label">Y bob ease</span><select class="cp-ease" data-var="--p10-ease-bob"></select></div>
+        <div class="cp-row-ease-raw"><input type="text" class="cp-ease-text" data-var="--p10-ease-bob" spellcheck="false" aria-label="Y bob ease value"></div>
+        <div class="cp-row"><span class="cp-label">Path ease</span><select class="cp-ease" data-var="--p10-ease-path"></select></div>
+        <div class="cp-row-ease-raw"><input type="text" class="cp-ease-text" data-var="--p10-ease-path" spellcheck="false" aria-label="Path ease value"></div>
+      </section>
+
+      <section class="cp-section">
+        <header class="cp-section-head">
+          <span class="cp-section-title">11. Avatar spring</span>
+          <button type="button" class="cp-export">Export</button>
+        </header>
+        <div class="cp-row"><span class="cp-label">Lift (px)</span><input type="number" data-var="--p11-lift" data-unit="px" min="-40" max="40" step="0.5" value="-4"></div>
+        <div class="cp-row"><span class="cp-label">Duration (ms)</span><input type="number" data-var="--p11-dur" data-unit="ms" min="0" max="2000" step="10" value="320"></div>
+        <div class="cp-row"><span class="cp-label">Falloff</span><input type="number" data-var="--p11-falloff" data-unit="" min="0" max="1" step="0.05" value="0.45"></div>
+        <div class="cp-row"><span class="cp-label">Scale</span><input type="number" data-var="--p11-scale" data-unit="" min="1" max="1.5" step="0.01" value="1.05"></div>
+        <div class="cp-row"><span class="cp-label">Bounce</span><input type="number" data-var="--p11-bounce" data-unit="" data-ease-template="--p11-ease-out:cubic-bezier(0.34, {v}, 0.64, 1)" min="1" max="5" step="0.02" value="3.85"></div>
+        <div class="cp-row"><span class="cp-label">Ease in</span><select class="cp-ease" data-var="--p11-ease-in"></select></div>
+        <div class="cp-row-ease-raw"><input type="text" class="cp-ease-text" data-var="--p11-ease-in" spellcheck="false" aria-label="Ease in value"></div>
+        <div class="cp-row"><span class="cp-label">Ease out</span><select class="cp-ease" data-var="--p11-ease-out"></select></div>
+        <div class="cp-row-ease-raw"><input type="text" class="cp-ease-text" data-var="--p11-ease-out" spellcheck="false" aria-label="Ease out value"></div>
+      </section>
+
+      <section class="cp-section">
+        <header class="cp-section-head">
+          <span class="cp-section-title">12. Input shake</span>
+          <button type="button" class="cp-export">Export</button>
+        </header>
+        <div class="cp-row"><span class="cp-label">Distance (px)</span><input type="number" data-var="--p12-shake-distance" data-unit="px" min="0" max="40" step="0.5" value="6"></div>
+        <div class="cp-row"><span class="cp-label">Overshoot (px)</span><input type="number" data-var="--p12-shake-overshoot" data-unit="px" min="0" max="40" step="0.5" value="4"></div>
+        <div class="cp-row"><span class="cp-label">Phase A (ms)</span><input type="number" data-var="--p12-shake-dur-a" data-unit="ms" min="0" max="500" step="5" value="80"></div>
+        <div class="cp-row"><span class="cp-label">Phase B (ms)</span><input type="number" data-var="--p12-shake-dur-b" data-unit="ms" min="0" max="500" step="5" value="60"></div>
+        <div class="cp-row"><span class="cp-label">Hold (ms)</span><input type="number" data-var="--p12-revert-hold" data-unit="ms" min="0" max="10000" step="100" value="3000"></div>
+        <div class="cp-row"><span class="cp-label">Revert (ms)</span><input type="number" data-var="--p12-revert-dur" data-unit="ms" min="0" max="2000" step="10" value="280"></div>
+        <div class="cp-row"><span class="cp-label">Ease</span><select class="cp-ease" data-var="--p12-shake-ease"></select></div>
+        <div class="cp-row-ease-raw"><input type="text" class="cp-ease-text" data-var="--p12-shake-ease" spellcheck="false" aria-label="Ease value"></div>
+      </section>
+
     </div>
   </aside>
 
@@ -1741,6 +2217,103 @@
           if (e.target.closest("[data-p8-back]")) {
             p8Modal.setAttribute("data-page", "1");
           }
+        });
+      }
+
+      // --- Prototype 10: Success check appear / disappear -----
+      const p10Check = document.getElementById("p10-check");
+
+      // --- Prototype 11: Avatar group hover spring ------------
+      // Each avatar reads --p11-shift and --p11-scale-active inline;
+      // on mouseenter we compute the shift for every sibling using
+      // a power-falloff (lift * pow(falloff, distance)) so closer
+      // neighbors lift more than far ones. The directly-hovered
+      // avatar additionally scales to var(--p11-scale).
+      //
+      // Direction-aware easing is achieved by writing
+      // transition-timing-function inline BEFORE each variable
+      // update: ease-in on the lift, ease-out (bouncy) on the
+      // return. The browser starts a new transition the moment
+      // --p11-shift / --p11-scale-active changes, picking up the
+      // freshly-set timing-function for that interpolation only.
+      //
+      // We deliberately leave z-index alone — the scale is small
+      // enough (5% by default) that any clipping by later siblings
+      // is imperceptible, and bumping z-index would briefly pull
+      // the hovered avatar above its neighbors during the return
+      // transition, which reads as a "pop" on hover-out.
+      //
+      // All knobs are re-read on every event so CP tweaks apply
+      // live without a page reload.
+      (function initP11() {
+        const root = document.getElementById("p11-avatars");
+        if (!root) return;
+        const avatars = Array.prototype.slice.call(
+          root.querySelectorAll(".p11-avatar")
+        );
+        const docEl = document.documentElement;
+        function readNum(name, fallback) {
+          const v = parseFloat(
+            getComputedStyle(docEl).getPropertyValue(name)
+          );
+          return isNaN(v) ? fallback : v;
+        }
+        function readEase(name, fallback) {
+          const v = getComputedStyle(docEl).getPropertyValue(name).trim();
+          return v || fallback;
+        }
+        function setShifts(activeIdx, phase) {
+          const lift = readNum("--p11-lift", -4);
+          const falloff = readNum("--p11-falloff", 0.45);
+          const scale = readNum("--p11-scale", 1.05);
+          const ease = phase === "out"
+            ? readEase("--p11-ease-out", "cubic-bezier(0.34, 3.85, 0.64, 1)")
+            : readEase("--p11-ease-in",  "cubic-bezier(0.22, 1, 0.36, 1)");
+          avatars.forEach(function (el, i) {
+            // Set timing-function FIRST so it applies to the
+            // transition kicked off by the variable writes below.
+            el.style.transitionTimingFunction = ease;
+            if (activeIdx == null) {
+              el.style.setProperty("--p11-shift", "0px");
+              el.style.setProperty("--p11-scale-active", "1");
+              return;
+            }
+            const d = Math.abs(i - activeIdx);
+            const shift = lift * Math.pow(falloff, d);
+            el.style.setProperty("--p11-shift", shift.toFixed(3) + "px");
+            const isActive = i === activeIdx;
+            el.style.setProperty(
+              "--p11-scale-active",
+              isActive ? scale.toString() : "1"
+            );
+          });
+        }
+        avatars.forEach(function (el, i) {
+          el.addEventListener("mouseenter", function () { setShifts(i, "in"); });
+        });
+        root.addEventListener("mouseleave", function () { setShifts(null, "out"); });
+      })();
+
+      // --- Prototype 12: Input field shake on error -----------
+      const p12Wrap = document.getElementById("p12-wrap");
+      const p12Input = p12Wrap ? p12Wrap.querySelector(".p12-input") : null;
+      const p12El = document.getElementById("p12-input");
+      // Pending auto-revert timer — kept at IIFE scope so a second
+      // Animate click (or a keystroke) cancels the previous one
+      // before scheduling a new revert.
+      let p12RevertTimer = null;
+      function p12ClearError() {
+        if (!p12Wrap || !p12Input) return;
+        p12Wrap.classList.remove("is-error");
+        p12Input.classList.remove("is-error");
+      }
+      if (p12El) {
+        p12El.addEventListener("input", function () {
+          if (p12RevertTimer) {
+            window.clearTimeout(p12RevertTimer);
+            p12RevertTimer = null;
+          }
+          p12ClearError();
         });
       }
 
@@ -1880,6 +2453,63 @@
                 p6Busy = false;
               }, p6Dur);
             }, p6Dur);
+            break;
+          }
+          case "10": {
+            if (!p10Check) break;
+            // Toggle between "in" and "out". On the "in"→"out"
+            // transition we add .is-exiting briefly so the soft
+            // exit animation plays; we never run the exit on cold
+            // load. To replay "in" cleanly on rapid re-triggers, we
+            // re-set data-state with a forced reflow in between so
+            // the keyframes restart from their initial offset.
+            const state = p10Check.getAttribute("data-state");
+            if (state === "in") {
+              p10Check.classList.add("is-exiting");
+              p10Check.setAttribute("data-state", "out");
+              const outMs = readMs("--p10-out-dur", 500);
+              window.setTimeout(function () {
+                p10Check.classList.remove("is-exiting");
+              }, outMs + 20);
+            } else {
+              p10Check.classList.remove("is-exiting");
+              p10Check.setAttribute("data-state", "out");
+              // eslint-disable-next-line no-unused-expressions
+              p10Check.offsetWidth;
+              p10Check.setAttribute("data-state", "in");
+            }
+            break;
+          }
+          case "12": {
+            if (!p12Wrap || !p12Input) break;
+            // Always show the error state when Animate is clicked,
+            // regardless of the current input value — this is the
+            // demo, not real validation. Replay the shake by
+            // removing the class, forcing a reflow, then re-adding.
+            p12Wrap.classList.add("is-error");
+            p12Input.classList.add("is-error");
+            p12Input.classList.remove("is-shaking");
+            // eslint-disable-next-line no-unused-expressions
+            p12Input.offsetWidth;
+            p12Input.classList.add("is-shaking");
+            const shakeMs =
+              readMs("--p12-shake-dur-a", 80) * 2 +
+              readMs("--p12-shake-dur-b", 60) * 2;
+            window.setTimeout(function () {
+              p12Input.classList.remove("is-shaking");
+            }, shakeMs + 20);
+            // Auto-revert: hold the error state long enough to read
+            // the message (--p12-revert-hold), then fade the border
+            // and message back to neutral via the existing CSS
+            // transitions (--p12-revert-dur). Cancels any in-flight
+            // revert from a previous click so the timer always
+            // tracks the latest Animate.
+            if (p12RevertTimer) window.clearTimeout(p12RevertTimer);
+            const holdMs = readMs("--p12-revert-hold", 3000);
+            p12RevertTimer = window.setTimeout(function () {
+              p12RevertTimer = null;
+              p12ClearError();
+            }, shakeMs + holdMs);
             break;
           }
         }

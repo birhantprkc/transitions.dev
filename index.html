@@ -125,7 +125,10 @@
       /* Horizontal inset for card title block + copy control */
       --card-pad-x: 20px;
 
-      --stage-bg: rgba(194, 194, 194, 0.1);
+      /* Opaque equivalent of rgba(194, 194, 194, 0.1) over #ffffff
+         (≈ #f9f9f9). Kept opaque on purpose so the stage doesn't pick
+         up the card's hover tint through a translucent fill. */
+      --stage-bg: #f9f9f9;
       --stage-border: rgba(0, 0, 0, 0.04);
 
       --chip-bg: #f4f4f4;
@@ -253,6 +256,14 @@
       --p7-scale-close: 0.96;
       --p7-ease: cubic-bezier(0.22, 1, 0.36, 1);
 
+      /* Detail-modal motion tokens. Defaults to the P7 modal timing
+         so desktop is unchanged. Mobile overrides these to the P3
+         "Panel reveal" timing inside its own @media block, which lets
+         the JS close-timer pick the right wait via getComputedStyle. */
+      --proto-modal-open-dur:  var(--p7-open-dur);
+      --proto-modal-close-dur: var(--p7-close-dur);
+      --proto-modal-ease:      var(--p7-ease);
+
       /* P8 — Page slide */
       --p8-slide-dur: 200ms;
       --p8-fade-dur: 200ms;
@@ -272,6 +283,53 @@
       --p9-ease: cubic-bezier(0.34, 1.45, 0.64, 1);
       --p9-dir-x: 0;
       --p9-dir-y: 1;
+
+      /* P10 — Success check (appear / disappear).
+         Entry composes 5 sub-transitions in parallel (fade, rotate,
+         blur, Y-bob, stroke-draw). Exit deliberately uses only 3
+         (fade, blur, stroke-undraw) so the disappearance reads as a
+         soft fade-away rather than a full reverse of the entrance. */
+      --p10-opacity-dur: 550ms;
+      --p10-rotate-dur: 550ms;
+      --p10-rotate-from: 80deg;
+      --p10-bob-dur:     550ms;
+      --p10-y-amount:    40px;
+      --p10-blur-dur:    500ms;
+      --p10-blur-from:   10px;
+      --p10-path-dur:    550ms;
+      --p10-path-delay:  80ms;
+      --p10-out-dur:     500ms;
+      --p10-ease-out:     cubic-bezier(0.22, 1, 0.36, 1);
+      --p10-ease-opacity: cubic-bezier(0.22, 1, 0.36, 1);
+      --p10-ease-rotate:  cubic-bezier(0.22, 1, 0.36, 1);
+      --p10-ease-bob:     cubic-bezier(0.34, 1.35, 0.64, 1);
+      --p10-ease-path:    cubic-bezier(0.22, 1, 0.36, 1);
+
+      /* P11 — Avatar group hover spring.
+         Each neighbor at distance d from the hovered avatar lifts by
+         --p11-lift * pow(--p11-falloff, d). Lift uses --p11-ease-in
+         (clean) and the return uses --p11-ease-out (bouncy spring). */
+      --p11-lift:    -4px;
+      --p11-dur:     320ms;
+      --p11-ease-in:  cubic-bezier(0.22, 1, 0.36, 1);
+      --p11-ease-out: cubic-bezier(0.34, 3.85, 0.64, 1);
+      --p11-scale:   1.05;
+      --p11-falloff: 0.45;
+
+      /* P12 — Input shake on error.
+         Four-phase translateX with a per-segment cubic-bezier per
+         keyframe stop (80 + 80 + 60 + 60 = 280ms total). After the
+         shake we hold --p12-revert-hold then fade border + message
+         back to neutral over --p12-revert-dur. */
+      --p12-shake-distance:  6px;
+      --p12-shake-overshoot: 4px;
+      --p12-shake-dur-a:     80ms;
+      --p12-shake-dur-b:     60ms;
+      --p12-shake-ease:      cubic-bezier(0.22, 1, 0.36, 1);
+      --p12-error-border:    #e23014;
+      --p12-error-text:      #d62b11;
+      --p12-revert-hold:     3000ms;
+      --p12-revert-dur:      280ms;
     }
 
     html[data-theme="dark"] {
@@ -994,11 +1052,146 @@
       outline-offset: 2px;
     }
 
+    /* ─── Course CTA — recommended Emil Kowalski course ───────
+       70px above (after the cards grid) and 70px below (before the
+       footer) per the Figma layout. The footer's own top padding is
+       set to 0 because this section provides its own breathing room. */
+    .course-cta {
+      display: flex;
+      align-items: center;
+      gap: 21px;
+      width: 100%;
+      max-width: 720px;
+      margin: 70px auto;
+      font-family: var(--font-sans);
+      color: var(--text);
+    }
+    .course-cta-divider {
+      flex-shrink: 0;
+      width: 2px;
+      height: 78px;
+      background: #d9d9d9;
+      border-radius: 1px;
+    }
+    html[data-theme="dark"] .course-cta-divider {
+      background: rgba(255, 255, 255, 0.14);
+    }
+    /* Desktop layout for the inner row: text fills the available
+       space and the pill button gets pushed to the right edge.
+       The wrapper exists so mobile (≤740px) can re-stack the text +
+       button vertically while the divider stays anchored on the left
+       — see the @media block below for the column override. */
+    .course-cta-inner {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+    .course-cta-text {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-width: 432px;
+    }
+    .course-cta-headline {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.4;
+      color: var(--text);
+    }
+    .course-cta-headline a {
+      color: inherit;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      /* 50% of the text color at rest, 100% on hover. Using
+         color-mix with currentColor keeps it theme-agnostic — the
+         underline tracks light/dark text without an explicit
+         dark-mode override. */
+      text-decoration-color: color-mix(in srgb, currentColor 50%, transparent);
+      transition: text-decoration-color 180ms ease;
+    }
+    .course-cta-headline a:hover {
+      text-decoration-color: currentColor;
+    }
+    .course-cta-byline {
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      font-size: 13px;
+      line-height: 18px;
+      opacity: 0.7;
+    }
+    .course-cta-name { color: var(--text); }
+    .course-cta-role { color: var(--text-muted); }
+
+    /* Pill button mirrors Figma 351:374 (Button/Small/Primary).
+       In light mode the pill is near-black with white text, mirrored
+       in dark mode (white pill, dark text). Hover lifts the surface
+       one tone instead of using opacity, so the icon stays crisp. */
+    .course-cta-button {
+      flex-shrink: 0;
+      /* Push the pill to the right edge of .course-cta-inner. The text
+         caps at max-width: 432px, so without this the leftover slack
+         lands AFTER the button instead of before it. */
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      height: 40px;
+      padding: 6px 16px;
+      border-radius: 24px;
+      background: #101010;
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 13px;
+      text-decoration: none;
+      /* Ease Out Smooth ─ cubic-bezier(0.22, 1, 0.36, 1), 200ms.
+         The arrow inside the icon shares the curve but runs at 250ms
+         so it lingers slightly longer than the button surface. */
+      transition: background-color 200ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .course-cta-button:hover { background: #2a2a2a; }
+    .course-cta-button:active { background: #000000; }
+    html[data-theme="dark"] .course-cta-button {
+      background: #ffffff;
+      color: #0d0d0d;
+    }
+    html[data-theme="dark"] .course-cta-button:hover { background: #e8e8e8; }
+    html[data-theme="dark"] .course-cta-button:active { background: #d8d8d8; }
+    .course-cta-button:focus-visible {
+      outline: 2px solid var(--text);
+      outline-offset: 3px;
+    }
+    .course-cta-icon {
+      display: inline-flex;
+      width: 16px;
+      height: 16px;
+    }
+    .course-cta-icon svg { width: 100%; height: 100%; }
+    /* Only the arrow group (corner + diagonal line) translates on
+       hover — the surrounding "open box" frame stays anchored, so the
+       arrow visually leans up-right out of the box. */
+    .course-cta-arrow {
+      /* Smooth Out, 250ms — slightly longer than the button's bg
+         tween so the arrow has its own gentle settle on hover-in
+         and slide-back on hover-out. */
+      transition: transform 250ms cubic-bezier(0.22, 1, 0.36, 1);
+      transform-origin: center;
+    }
+    .course-cta-button:hover .course-cta-arrow {
+      transform: translate(1.5px, -1.5px);
+    }
+
     /* ─── Footer ──────────────────────────────────────────────── */
     .footer {
       width: 100%;
       text-align: center;
-      padding: 96px 0 24px;
+      padding: 0 0 24px;
       font-family: var(--font-sans);
       font-size: 13px;
       line-height: 14px;
@@ -1755,6 +1948,258 @@
       }
     }
 
+    /* ─── Prototype 10 — Success check appear / disappear ────── */
+    /* Geometry mirrors Figma node 358:786 exactly: 48×48 frame,
+       circle is the SVG <circle> at 10% opacity of #35BA00 (the
+       hex shared with the check stroke). The path is drawn via
+       stroke-dashoffset; length ≈ 19.7, we use 20 with round caps
+       so a tiny overshoot is invisible. */
+    .p10-stage-inner {
+      padding-bottom: 0;
+    }
+    .p10-check {
+      width: 48px;
+      height: 48px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transform-origin: center;
+      opacity: 0;
+      will-change: transform, opacity, filter;
+    }
+    .p10-check svg {
+      width: 48px;
+      height: 48px;
+      display: block;
+      overflow: visible;
+    }
+    .p10-check svg path {
+      stroke-dasharray: 20;
+      stroke-dashoffset: 20;
+    }
+    .p10-check[data-state="in"] {
+      animation:
+        p10-fade   var(--p10-opacity-dur) var(--p10-ease-opacity) forwards,
+        p10-rotate var(--p10-rotate-dur)  var(--p10-ease-rotate)  forwards,
+        p10-blur   var(--p10-blur-dur)    var(--p10-ease-out)     forwards,
+        p10-bob    var(--p10-bob-dur)     var(--p10-ease-bob)     forwards;
+    }
+    .p10-check[data-state="in"] svg path {
+      animation: p10-draw var(--p10-path-dur) var(--p10-ease-path) var(--p10-path-delay, 0ms) forwards;
+    }
+    /* Exit runs only fade + blur + path-undraw — rotate and Y are
+       intentionally omitted so the icon dissolves in place rather
+       than flicking back on a short out-duration. */
+    .p10-check.is-exiting {
+      animation:
+        p10-fade-out var(--p10-out-dur) var(--p10-ease-out) forwards,
+        p10-blur-out var(--p10-out-dur) var(--p10-ease-out) forwards;
+    }
+    .p10-check.is-exiting svg path {
+      animation: p10-draw-out var(--p10-out-dur) var(--p10-ease-out) forwards;
+    }
+    @keyframes p10-fade     { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes p10-fade-out { from { opacity: 1; } to { opacity: 0; } }
+    @keyframes p10-rotate {
+      from { transform: rotate(var(--p10-rotate-from)); }
+      to   { transform: rotate(0deg); }
+    }
+    @keyframes p10-blur {
+      from { filter: blur(var(--p10-blur-from)); }
+      to   { filter: blur(0); }
+    }
+    @keyframes p10-blur-out {
+      from { filter: blur(0); }
+      to   { filter: blur(var(--p10-blur-from)); }
+    }
+    @keyframes p10-bob {
+      from { translate: 0 var(--p10-y-amount); }
+      to   { translate: 0 0; }
+    }
+    @keyframes p10-draw     { to { stroke-dashoffset: 0; } }
+    @keyframes p10-draw-out { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 20; } }
+
+    /* ─── Prototype 11 — Avatar group hover spring ───────────── */
+    /* Each .p11-avatar reads two inline CSS variables that JS
+       writes on mouseenter / mouseleave of any sibling:
+         --p11-shift         per-avatar Y translation (px)
+         --p11-scale-active  scale applied to the hovered avatar
+                             only (1 for everyone else)
+       JS swaps transition-timing-function inline before each
+       phase so the lift uses --p11-ease-in (clean) and the
+       return uses --p11-ease-out (bouncy). */
+    /* P11 has no Animate button, so reclaim the 56px the stage
+       reserves for one and centre the avatars in the full stage. */
+    .p11-stage-inner {
+      padding-bottom: 0;
+    }
+    .p11-avatars {
+      display: flex;
+      align-items: center;
+    }
+    .p11-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      /* Match the stage bg so the ring around overlapping avatars
+         disappears against the surface they sit on. */
+      border: 1.5px solid var(--stage-bg);
+      margin-right: -8px;
+      flex-shrink: 0;
+      overflow: hidden;
+      background: #eeeeef;
+      position: relative;
+      cursor: pointer;
+      transform-origin: center;
+      transform:
+        translateY(var(--p11-shift, 0px))
+        scale(var(--p11-scale-active, 1));
+      transition: transform var(--p11-dur) var(--p11-ease-in);
+      will-change: transform;
+    }
+    .p11-avatar:last-child { margin-right: 0; }
+    .p11-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      pointer-events: none;
+    }
+    .p11-avatar-more {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-sans);
+      font-weight: 500;
+      font-size: 12px;
+      color: var(--text);
+      /* ~20% darker than the stage bg in light mode so the pill
+         reads as its own surface next to the avatars instead of
+         dissolving into the background. */
+      background: color-mix(in srgb, var(--stage-bg) 80%, #000 20%);
+      cursor: default;
+    }
+    html[data-theme="dark"] .p11-avatar {
+      background: #2a2a2a;
+    }
+    /* Inverse in dark mode: lift the pill ~20% above the stage. */
+    html[data-theme="dark"] .p11-avatar-more {
+      background: color-mix(in srgb, var(--stage-bg) 80%, #fff 20%);
+    }
+
+    /* ─── Prototype 12 — Input shake on error ─────────────────── */
+    /* Reclaim the 56px the stage reserves for the Animate button so
+       the input wrap centres in the full stage. The button stays
+       pinned to bottom: 20px and overlaps the wrap area harmlessly
+       (the wrap is only ~58px tall, button has its own backdrop). */
+    .p12-stage-inner {
+      padding-bottom: 0;
+    }
+    .p12-input-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      width: 220px;
+    }
+    /* Border colors mirror Figma node 366:423 (Default / Focused /
+       Error). We use 1px width for every state — focused / error only
+       override border-color, never width, so transitioning between
+       states animates color only and never shifts the inner content. */
+    .p12-input {
+      display: flex;
+      align-items: center;
+      height: 36px;
+      padding: 4px 4px 4px 12px;
+      border-radius: 8px;
+      border: 1px solid #dcdcdc;
+      background: var(--card-bg);
+      outline: none;
+      transition:
+        border-color 150ms ease-out;
+      will-change: transform;
+    }
+    html[data-theme="dark"] .p12-input {
+      border-color: rgba(255, 255, 255, 0.14);
+      background: #1f1f1f;
+      outline: none;
+    }
+    .p12-input:focus-within {
+      border-color: #585858;
+      outline: none;
+    }
+    html[data-theme="dark"] .p12-input:focus-within {
+      border-color: rgba(255, 255, 255, 0.55);
+      outline: none;
+    }
+    .p12-input.is-error,
+    html[data-theme="dark"] .p12-input.is-error {
+      border-color: var(--p12-error-border);
+      outline: none;
+      /* Error border auto-reverts over the longer hold timer, so use
+         the slower revert duration here (matches the message fade). */
+      transition: border-color var(--p12-revert-dur, 280ms) ease-out;
+    }
+    .p12-input-el {
+      flex: 1 0 0;
+      min-width: 0;
+      height: 100%;
+      border: 0;
+      outline: none;
+      background: transparent;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      line-height: 1.4;
+      color: var(--text);
+      padding: 0;
+    }
+    .p12-input-el::placeholder {
+      color: var(--text-muted);
+    }
+    .p12-input-el:focus,
+    .p12-input-el:focus-visible {
+      outline: none;
+    }
+    /* Visibility transitions with a delay equal to the opacity fade
+       so the message stays "visible" for the duration of the fade-out.
+       When entering the error state we override the delay to 0 so the
+       message becomes visible immediately and only opacity animates. */
+    .p12-error-msg {
+      font-family: var(--font-sans);
+      font-size: 13px;
+      line-height: 1.4;
+      color: var(--p12-error-text);
+      margin: 0;
+      opacity: 0;
+      visibility: hidden;
+      transition:
+        opacity    var(--p12-revert-dur, 280ms) ease-out,
+        visibility 0s linear var(--p12-revert-dur, 280ms);
+    }
+    .p12-input-wrap.is-error .p12-error-msg {
+      opacity: 1;
+      visibility: visible;
+      transition:
+        opacity    var(--p12-revert-dur, 280ms) ease-out,
+        visibility 0s linear 0s;
+    }
+    /* Per-segment ease via animation-timing-function on each stop, so
+       each leg of the shake follows the Figma cubic-bezier curve
+       independently. The %-stops are cumulative durations as a
+       fraction of the total (80, 160, 220, 280): 28.57%, 57.14%,
+       78.57%, 100%. Recompute if any segment duration changes. */
+    .p12-input.is-shaking {
+      animation: p12-shake calc(
+          var(--p12-shake-dur-a) * 2 + var(--p12-shake-dur-b) * 2
+        ) linear;
+    }
+    @keyframes p12-shake {
+      0%      { transform: translateX(0);                                         animation-timing-function: var(--p12-shake-ease); }
+      28.57%  { transform: translateX(var(--p12-shake-distance));                 animation-timing-function: var(--p12-shake-ease); }
+      57.14%  { transform: translateX(calc(var(--p12-shake-distance) * -1));     animation-timing-function: var(--p12-shake-ease); }
+      78.57%  { transform: translateX(var(--p12-shake-overshoot));                animation-timing-function: var(--p12-shake-ease); }
+      100%    { transform: translateX(0); }
+    }
+
     /* ============================================================ */
     /* Responsive — mirrors border-beam demo breakpoints            */
     /* ============================================================ */
@@ -1764,6 +2209,32 @@
 
     @media (max-width: 740px) {
       .cards { grid-template-columns: 320px; gap: 16px; }
+      /* Keep the divider on the left and stack only the copy + pill
+         vertically. Tighten margins to feel less roomy on small
+         viewports. */
+      .course-cta {
+        align-items: stretch;
+        /* Reduce left gutter so the CTA block stays visually centered
+           relative to the 320px cards while the divider remains pinned
+           on the left edge. */
+        gap: 10px;
+        max-width: 320px;
+        margin: 56px auto;
+      }
+      .course-cta-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .course-cta-divider { height: auto; align-self: stretch; }
+      .course-cta-text { max-width: none; }
+      /* On mobile the inner is a column, so the desktop's
+         margin-left: auto would push the button to the right edge of
+         the column — reset it so the button hugs the start. */
+      .course-cta-button { margin-left: 0; }
     }
 
     @media (max-width: 639px) {
@@ -1818,7 +2289,7 @@
         left: 50%;
         margin-left: -130px;
       }
-      .footer { padding: 64px 0 24px; }
+      .footer { padding: 0 0 24px; }
     }
 
     /* ─── Reduced motion ─────────────────────────────────────── */
@@ -1831,10 +2302,15 @@
       .bell-badge-inner,
       .p5-icon-wrap .icon,
       .p6-text,
-      .p9-char {
+      .p9-char,
+      .p10-check,
+      .p11-avatar,
+      .p12-input,
+      .course-cta-arrow {
         transform: none !important;
         filter: none !important;
       }
+      .p10-check svg path { stroke-dashoffset: 0 !important; }
     }
 
     /* ─── Prototype detail modal ──────────────────────────────
@@ -1847,11 +2323,26 @@
       cursor: pointer;
     }
 
-    /* Reuses the P7 "Modal open / close" prototype transition so the
-       detail modal opens and closes with the same motion as the demo:
-         open  → scale(--p7-scale)      → scale(1)    over --p7-open-dur
-         close → scale(1)               → scale(--p7-scale-close)
-                                                      over --p7-close-dur */
+    /* ────────────────────────────────────────────────────────────
+       WIP / hidden prototypes (P10 Success check, P11 Avatar group,
+       P12 Input shake). All supporting CSS, JS handlers and modal
+       templates remain in place — only the visible cards are hidden.
+       To enable them later, delete THIS rule (one-line removal) and/or
+       drop the data-wip="true" attribute from the corresponding
+       <article class="card" data-proto-card> blocks below.
+       ──────────────────────────────────────────────────────────── */
+    .card[data-proto-card][data-wip="true"] {
+      display: none !important;
+    }
+
+    /* Desktop reuses the P7 "Modal open / close" prototype transition:
+         open  → scale(--p7-scale) → scale(1)    over --p7-open-dur
+         close → scale(1) → scale(--p7-scale-close) over --p7-close-dur
+       Mobile (≤639px) re-skins the dialog as a bottom-anchored sheet
+       with panel-reveal style fade + cross-blur and explicit Y travel:
+         open  → translateY(300px) -> rest
+         close → rest -> translateY(200px)
+       See the @media block below. */
     .proto-modal-root {
       position: fixed;
       inset: 0;
@@ -1874,12 +2365,12 @@
       inset: 0;
       background: rgba(0, 0, 0, 0.2);
       opacity: 0;
-      transition: opacity var(--p7-open-dur) var(--p7-ease);
+      transition: opacity var(--proto-modal-open-dur) var(--proto-modal-ease);
     }
     .proto-modal-root.is-open .proto-modal-backdrop { opacity: 1; }
     .proto-modal-root.is-closing .proto-modal-backdrop {
       opacity: 0;
-      transition: opacity var(--p7-close-dur) var(--p7-ease);
+      transition: opacity var(--proto-modal-close-dur) var(--proto-modal-ease);
     }
     .proto-modal-dialog {
       position: relative;
@@ -1895,8 +2386,8 @@
       transform: scale(var(--p7-scale));
       opacity: 0;
       transition:
-        transform var(--p7-open-dur) var(--p7-ease),
-        opacity   var(--p7-open-dur) var(--p7-ease);
+        transform var(--proto-modal-open-dur) var(--proto-modal-ease),
+        opacity   var(--proto-modal-open-dur) var(--proto-modal-ease);
       will-change: transform, opacity;
     }
     html[data-theme="dark"] .proto-modal-dialog {
@@ -1911,8 +2402,8 @@
       transform: scale(var(--p7-scale-close));
       opacity: 0;
       transition:
-        transform var(--p7-close-dur) var(--p7-ease),
-        opacity   var(--p7-close-dur) var(--p7-ease);
+        transform var(--proto-modal-close-dur) var(--proto-modal-ease),
+        opacity   var(--proto-modal-close-dur) var(--proto-modal-ease);
     }
     /* Close affordance — Figma "Button/Small/Tertiary/Default
        Icon only" (255:326). 32px pill with a persistent fill at
@@ -2113,12 +2604,24 @@
     }
 
     @media (max-width: 639px) {
+      /* Mobile presents the detail view as a bottom-anchored sheet,
+         but the open/close motion is the same P7 scale+fade used on
+         desktop — the @media block only re-skins layout (anchor,
+         margins, padding, type sizes). All transition rules live on
+         the desktop selectors so there is exactly one motion path. */
       .proto-modal-root {
-        align-items: safe center;
-        padding: 20px;
+        align-items: flex-end;
+        justify-content: stretch;
+        padding: 0;
+        overflow-y: hidden;
       }
       .proto-modal-dialog {
+        margin: 8px;
+        width: auto;
+        max-width: none;
+        max-height: calc(100dvh - 16px);
         padding: 22px 20px 20px;
+        border-radius: 24px;
       }
       .proto-modal-title {
         font-size: 17px;
@@ -2537,7 +3040,157 @@
         </button>
       </article>
 
+      <!-- 10. Success check -->
+      <article class="card" data-proto-card data-wip="true">
+        <div class="card-stage">
+          <div class="stage-inner p10-stage-inner">
+            <div class="p10-check" data-proto-check data-state="out" aria-hidden="true">
+              <!-- 1:1 export of Figma node 358:786. Circle + check
+                   share the same #35BA00 hue; the circle uses
+                   fill-opacity 0.1 for the soft tint, the path is
+                   stroked over it via stroke-dashoffset. -->
+              <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <circle cx="24" cy="24" r="24" fill="#35BA00" fill-opacity="0.1"/>
+                <path d="M17.2803 24.9602L21.7603 29.7602L30.7203 20.1602"
+                      stroke="#35BA00"
+                      stroke-width="3"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </div>
+          <button type="button" class="btn-animate" data-proto="10">Animate</button>
+        </div>
+        <div class="card-meta">
+          <div class="card-title">Success check</div>
+          <div class="card-subtitle">Succes check with blur and rotate</div>
+        </div>
+        <button type="button" class="card-copy" aria-label="Copy Success check CSS" data-copy-key="p10">
+          <svg class="icon-copy" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+          <svg class="icon-check" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </button>
+      </article>
+
+      <!-- 11. Avatar group hover spring -->
+      <article class="card" data-proto-card data-wip="true">
+        <div class="card-stage">
+          <div class="stage-inner p11-stage-inner">
+            <div class="p11-avatars" data-proto-avatars>
+              <div class="p11-avatar" data-index="0">
+                <img src="https://i.pravatar.cc/64?u=p11-1" alt="" loading="lazy">
+              </div>
+              <div class="p11-avatar" data-index="1">
+                <img src="https://i.pravatar.cc/64?u=p11-2" alt="" loading="lazy">
+              </div>
+              <div class="p11-avatar" data-index="2">
+                <img src="https://i.pravatar.cc/64?u=p11-3" alt="" loading="lazy">
+              </div>
+              <div class="p11-avatar" data-index="3">
+                <img src="https://i.pravatar.cc/64?u=p11-4" alt="" loading="lazy">
+              </div>
+              <div class="p11-avatar" data-index="4">
+                <img src="https://i.pravatar.cc/64?u=p11-5" alt="" loading="lazy">
+              </div>
+              <div class="p11-avatar" data-index="5">
+                <img src="https://i.pravatar.cc/64?u=p11-6" alt="" loading="lazy">
+              </div>
+              <div class="p11-avatar p11-avatar-more" data-index="6">+2</div>
+            </div>
+          </div>
+        </div>
+        <div class="card-meta">
+          <div class="card-title">Avatar group hover</div>
+          <div class="card-subtitle">Distance-falloff lift with bouncy return</div>
+        </div>
+        <button type="button" class="card-copy" aria-label="Copy Avatar group hover CSS" data-copy-key="p11">
+          <svg class="icon-copy" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+          <svg class="icon-check" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </button>
+      </article>
+
+      <!-- 12. Input shake on error -->
+      <article class="card" data-proto-card data-wip="true">
+        <div class="card-stage">
+          <div class="stage-inner p12-stage-inner">
+            <div class="p12-input-wrap" data-proto-shake>
+              <div class="p12-input">
+                <input class="p12-input-el"
+                       type="text" value="John"
+                       spellcheck="false" autocomplete="off"
+                       aria-label="Name">
+              </div>
+              <p class="p12-error-msg">Please enter a valid email.</p>
+            </div>
+          </div>
+          <button type="button" class="btn-animate" data-proto="12">Animate</button>
+        </div>
+        <div class="card-meta">
+          <div class="card-title">Error state shake</div>
+          <div class="card-subtitle">Cubic-bezier shake on error</div>
+        </div>
+        <button type="button" class="card-copy" aria-label="Copy Error state shake CSS" data-copy-key="p12">
+          <svg class="icon-copy" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+          <svg class="icon-check" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </button>
+      </article>
+
     </section>
+
+    <!-- ─── Recommended course CTA (Figma 356:350) ───────────────
+         Vertical accent bar + two-line copy + pill button. The pill's
+         external-link icon has a static frame and a separate arrow
+         group that translates 1.5px diagonally up-right on hover. -->
+    <aside class="course-cta" aria-label="Recommended course">
+      <span class="course-cta-divider" aria-hidden="true"></span>
+      <!-- .course-cta-inner exists so the divider can stay anchored on
+           the left while the copy + pill collapse vertically on mobile. -->
+      <div class="course-cta-inner">
+        <div class="course-cta-text">
+          <p class="course-cta-headline">
+            If you want to learn more about crafting UI animations, I highly recommend <a href="https://animations.dev/" target="_blank" rel="noopener noreferrer">Emil Kowalski&rsquo;s course</a>.
+          </p>
+          <p class="course-cta-byline">
+            <span class="course-cta-name">Jakub Antalik</span>
+            <span class="course-cta-role">Creator of Transitions.dev</span>
+          </p>
+        </div>
+        <a
+          class="course-cta-button"
+          href="https://animations.dev/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <span>Take the course</span>
+          <span class="course-cta-icon" aria-hidden="true">
+            <!-- "link-external-01" traced from Figma node 356:346 at
+                 native 16×16 (matches the asset pixel-for-pixel). The
+                 box stays anchored; the arrow group (chevron + line)
+                 translates 1.5px diagonally on hover. -->
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M7.5 2.5H4.5C3.39543 2.5 2.5 3.39543 2.5 4.5V11.5C2.5 12.6046 3.39543 13.5 4.5 13.5H11.5C12.6046 13.5 13.5 12.6046 13.5 11.5V8.5"/>
+              <g class="course-cta-arrow">
+                <path d="M8.5 7.5L13.5 2.5M10 2.5H13.5V6"/>
+              </g>
+            </svg>
+          </span>
+        </a>
+      </div>
+    </aside>
 
     <footer class="footer">
       <span class="footer-muted">Made by</span><a
@@ -2901,6 +3554,208 @@ export function NumberPopIn({ value = "123" }) {
       </span>
     </>
   );
+}
+</script>
+
+  <script type="text/plain" data-react-key="p10">import { useRef, useState } from "react";
+
+// Pair with the CSS from the CSS tab.
+// The .t-success-check wrapper is the API surface — drop any icon
+// (SVG, image, glyph) inside it. data-state drives the entrance ("in")
+// and the resting hidden state ("out"). On "in" → "out" we briefly add
+// `.is-exiting` so the soft fade-out animations play; the cold "out"
+// state never runs the exit. Replay of "in" is handled by clearing
+// the state and re-applying it on the next animation frame so the
+// keyframes restart cleanly.
+export function SuccessCheck({ children }) {
+  const [state, setState] = useState("out");
+  const [exiting, setExiting] = useState(false);
+  const ref = useRef(null);
+
+  const toggle = () => {
+    if (state === "in") {
+      setExiting(true);
+      setState("out");
+      window.setTimeout(() => setExiting(false), readMs("--check-out-dur", 500) + 20);
+    } else {
+      setExiting(false);
+      // Force a layout commit before flipping back to "in" so the
+      // browser re-runs the entrance keyframes from offset 0.
+      requestAnimationFrame(() => {
+        if (ref.current) void ref.current.offsetWidth;
+        setState("in");
+      });
+    }
+  };
+
+  return (
+    <>
+      <button type="button" onClick={toggle}>Animate</button>
+      <span
+        ref={ref}
+        className={"t-success-check" + (exiting ? " is-exiting" : "")}
+        data-state={state}
+        aria-hidden="true"
+      >
+        {children /* drop your SVG / icon here */}
+      </span>
+    </>
+  );
+}
+
+function readMs(name, fallback) {
+  const raw = getComputedStyle(document.documentElement)
+    .getPropertyValue(name).trim();
+  const n = parseFloat(raw);
+  return Number.isFinite(n) ? n : fallback;
+}
+</script>
+
+  <script type="text/plain" data-react-key="p11">import { useRef } from "react";
+
+// Pair with the CSS from the CSS tab.
+// `items` is any list of React nodes (avatars, chips, badges, etc.) —
+// this hook only owns the hover-spring transition. Each item is wrapped
+// in a .t-avatar so it picks up the transform/transition rules from CSS.
+//
+// On mouseenter of any sibling, we write per-item:
+//   --shift         = lift * pow(falloff, distance from hovered)
+//   --scale-active  = scale on the hovered item, 1 elsewhere
+// Direction-aware easing: we set transition-timing-function inline
+// BEFORE the variable writes so the lift uses --avatar-ease-in
+// (clean) and the return uses --avatar-ease-out (bouncy spring).
+export function AvatarGroup({ items }) {
+  const rootRef = useRef(null);
+
+  const setShifts = (activeIdx, phase) => {
+    if (!rootRef.current) return;
+    const cs = getComputedStyle(document.documentElement);
+    const num = (name, fb) => {
+      const v = parseFloat(cs.getPropertyValue(name));
+      return Number.isFinite(v) ? v : fb;
+    };
+    const ease = (name, fb) =>
+      cs.getPropertyValue(name).trim() || fb;
+
+    const lift    = num("--avatar-lift", -4);
+    const falloff = num("--avatar-falloff", 0.45);
+    const scale   = num("--avatar-scale", 1.05);
+    const tf      = phase === "out"
+      ? ease("--avatar-ease-out", "cubic-bezier(0.34, 3.85, 0.64, 1)")
+      : ease("--avatar-ease-in",  "cubic-bezier(0.22, 1, 0.36, 1)");
+
+    const els = rootRef.current.querySelectorAll(".t-avatar");
+    els.forEach((el, i) => {
+      el.style.transitionTimingFunction = tf;
+      if (activeIdx == null) {
+        el.style.setProperty("--shift", "0px");
+        el.style.setProperty("--scale-active", "1");
+        return;
+      }
+      const d = Math.abs(i - activeIdx);
+      el.style.setProperty(
+        "--shift",
+        (lift * Math.pow(falloff, d)).toFixed(3) + "px"
+      );
+      el.style.setProperty(
+        "--scale-active",
+        i === activeIdx ? String(scale) : "1"
+      );
+    });
+  };
+
+  return (
+    <div
+      ref={rootRef}
+      onMouseLeave={() => setShifts(null, "out")}
+    >
+      {items.map((node, i) => (
+        <div
+          key={i}
+          className="t-avatar"
+          onMouseEnter={() => setShifts(i, "in")}
+        >
+          {node}
+        </div>
+      ))}
+    </div>
+  );
+}
+</script>
+
+  <script type="text/plain" data-react-key="p12">import { useRef, useState } from "react";
+
+// Pair with the CSS from the CSS tab.
+// This hook owns ONLY the shake + error-state wiring; the input
+// markup, message text, sizing, and border colors are yours.
+//
+// Wire it in as:
+//   <InputShake message="Please enter a valid email.">
+//     <input type="text" onInput={onUserEdit} />
+//   </InputShake>
+//
+// `Animate` always triggers the error state — this is a demo, not
+// real validation. The shake replay pattern is the same as the rest
+// of the gallery: drop the class, force a reflow, re-add it. We
+// then auto-revert after --revert-hold so the demo self-resets.
+// Pass an `onCancel` if you want to clear the error early when the
+// user starts editing (e.g. on the input's `onInput` event).
+export function InputShake({ children, message, onCancel }) {
+  const inputRef = useRef(null);
+  const timerRef = useRef(null);
+  const [error, setError] = useState(false);
+
+  const trigger = () => {
+    if (!inputRef.current) return;
+    setError(true);
+    inputRef.current.classList.remove("is-shaking");
+    void inputRef.current.offsetWidth;
+    inputRef.current.classList.add("is-shaking");
+
+    if (timerRef.current) window.clearTimeout(timerRef.current);
+    const shakeMs =
+      readMs("--shake-dur-a", 80) * 2 +
+      readMs("--shake-dur-b", 60) * 2;
+    const hold = readMs("--revert-hold", 3000);
+    timerRef.current = window.setTimeout(() => {
+      setError(false);
+      timerRef.current = null;
+    }, shakeMs + hold);
+  };
+
+  // Call this from your input's onInput / onChange handler if you
+  // want typing to cancel the auto-revert and clear the error.
+  const cancel = () => {
+    if (timerRef.current) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    setError(false);
+    onCancel?.();
+  };
+
+  return (
+    <>
+      <button type="button" onClick={trigger}>Animate</button>
+      <div className={"t-input-wrap" + (error ? " is-error" : "")}>
+        <div
+          ref={inputRef}
+          className={"t-input" + (error ? " is-error" : "")}
+          onInput={cancel}
+        >
+          {children}
+        </div>
+        <p className="t-error-msg">{message}</p>
+      </div>
+    </>
+  );
+}
+
+function readMs(name, fallback) {
+  const raw = getComputedStyle(document.documentElement)
+    .getPropertyValue(name).trim();
+  const n = parseFloat(raw);
+  return Number.isFinite(n) ? n : fallback;
 }
 </script>
 
@@ -3467,6 +4322,260 @@ export function NumberPopIn({ value = "123" }) {
             "@media (prefers-reduced-motion: reduce) {\n" +
             "  .t-digit-group .t-digit { animation: none !important; }\n" +
             "}"
+        },
+
+        p10: {
+          name: "Success check",
+          usage:
+            "    <!-- Wrap your icon (SVG, image, anything) in .t-success-check.\n" +
+            "         The wrapper drives fade + rotate + blur + Y-bob; if your\n" +
+            "         icon is an SVG <path>, it gets the stroke-draw animation.\n" +
+            "         Bring your own icon size / colors. -->\n" +
+            "    <span class=\"t-success-check\" data-state=\"out\" aria-hidden=\"true\">\n" +
+            "      <svg viewBox=\"0 0 48 48\" fill=\"none\">\n" +
+            "        <!-- your icon path(s) here -->\n" +
+            "      </svg>\n" +
+            "    </span>\n" +
+            "\n" +
+            "  State machine:\n" +
+            "    - Cold load is data-state=\"out\" (opacity 0; no animation).\n" +
+            "    - Show: set data-state=\"in\" (entry runs fade + rotate +\n" +
+            "      blur + Y-bob + path draw in parallel).\n" +
+            "    - Hide: add `.is-exiting`, set data-state=\"out\". After\n" +
+            "      --check-out-dur ms remove `.is-exiting` so a future\n" +
+            "      \"in\" replays cleanly.\n" +
+            "\n" +
+            "  Note: rotate and Y are intentionally absent from the exit so\n" +
+            "  the icon dissolves in place — animating them backwards on a\n" +
+            "  short out-duration reads as a nervous flick.",
+          vars: [
+            ["--check-opacity-dur",  "--p10-opacity-dur"],
+            ["--check-rotate-dur",   "--p10-rotate-dur"],
+            ["--check-rotate-from",  "--p10-rotate-from"],
+            ["--check-bob-dur",      "--p10-bob-dur"],
+            ["--check-y-amount",     "--p10-y-amount"],
+            ["--check-blur-dur",     "--p10-blur-dur"],
+            ["--check-blur-from",    "--p10-blur-from"],
+            ["--check-path-dur",     "--p10-path-dur"],
+            ["--check-path-delay",   "--p10-path-delay"],
+            ["--check-out-dur",      "--p10-out-dur"],
+            ["--check-ease-out",     "--p10-ease-out"],
+            ["--check-ease-opacity", "--p10-ease-opacity"],
+            ["--check-ease-rotate",  "--p10-ease-rotate"],
+            ["--check-ease-bob",     "--p10-ease-bob"],
+            ["--check-ease-path",    "--p10-ease-path"]
+          ],
+          css:
+            "/* Wrapper drives the entrance / exit animations; it doesn't\n" +
+            "   own any sizing or color so you can drop in any icon. */\n" +
+            ".t-success-check {\n" +
+            "  display: inline-block;\n" +
+            "  transform-origin: center;\n" +
+            "  opacity: 0;\n" +
+            "  will-change: transform, opacity, filter;\n" +
+            "}\n" +
+            "/* overflow: visible keeps the stroke from clipping while it\n" +
+            "   draws; display: block kills the inline whitespace under SVGs. */\n" +
+            ".t-success-check svg { display: block; overflow: visible; }\n" +
+            "/* Stroke-draw setup. Replace 20 with the result of\n" +
+            "   path.getTotalLength() for your path; round caps mean any\n" +
+            "   sub-pixel overshoot is invisible. */\n" +
+            ".t-success-check svg path {\n" +
+            "  stroke-dasharray: 20;\n" +
+            "  stroke-dashoffset: 20;\n" +
+            "}\n" +
+            "\n" +
+            ".t-success-check[data-state=\"in\"] {\n" +
+            "  animation:\n" +
+            "    t-check-fade   var(--check-opacity-dur) var(--check-ease-opacity) forwards,\n" +
+            "    t-check-rotate var(--check-rotate-dur)  var(--check-ease-rotate)  forwards,\n" +
+            "    t-check-blur   var(--check-blur-dur)    var(--check-ease-out)     forwards,\n" +
+            "    t-check-bob    var(--check-bob-dur)     var(--check-ease-bob)     forwards;\n" +
+            "}\n" +
+            ".t-success-check[data-state=\"in\"] svg path {\n" +
+            "  animation: t-check-draw var(--check-path-dur) var(--check-ease-path) var(--check-path-delay, 0ms) forwards;\n" +
+            "}\n" +
+            "\n" +
+            ".t-success-check.is-exiting {\n" +
+            "  animation:\n" +
+            "    t-check-fade-out var(--check-out-dur) var(--check-ease-out) forwards,\n" +
+            "    t-check-blur-out var(--check-out-dur) var(--check-ease-out) forwards;\n" +
+            "}\n" +
+            ".t-success-check.is-exiting svg path {\n" +
+            "  animation: t-check-draw-out var(--check-out-dur) var(--check-ease-out) forwards;\n" +
+            "}\n" +
+            "\n" +
+            "@keyframes t-check-fade     { from { opacity: 0; } to { opacity: 1; } }\n" +
+            "@keyframes t-check-fade-out { from { opacity: 1; } to { opacity: 0; } }\n" +
+            "@keyframes t-check-rotate {\n" +
+            "  from { transform: rotate(var(--check-rotate-from)); }\n" +
+            "  to   { transform: rotate(0deg); }\n" +
+            "}\n" +
+            "@keyframes t-check-blur {\n" +
+            "  from { filter: blur(var(--check-blur-from)); }\n" +
+            "  to   { filter: blur(0); }\n" +
+            "}\n" +
+            "@keyframes t-check-blur-out {\n" +
+            "  from { filter: blur(0); }\n" +
+            "  to   { filter: blur(var(--check-blur-from)); }\n" +
+            "}\n" +
+            "@keyframes t-check-bob {\n" +
+            "  from { translate: 0 var(--check-y-amount); }\n" +
+            "  to   { translate: 0 0; }\n" +
+            "}\n" +
+            "@keyframes t-check-draw     { to { stroke-dashoffset: 0; } }\n" +
+            "@keyframes t-check-draw-out { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 20; } }\n" +
+            "\n" +
+            "@media (prefers-reduced-motion: reduce) {\n" +
+            "  .t-success-check { animation: none !important; opacity: 1; }\n" +
+            "  .t-success-check svg path { animation: none !important; stroke-dashoffset: 0 !important; }\n" +
+            "}"
+        },
+
+        p11: {
+          name: "Avatar group hover",
+          usage:
+            "    <!-- Apply .t-avatar to each item in your group (avatar,\n" +
+            "         chip, badge, button — anything). Bring your own size,\n" +
+            "         shape, and stacking; this stylesheet only owns the\n" +
+            "         hover transform + transition. -->\n" +
+            "    <div class=\"t-avatar-group\">\n" +
+            "      <div class=\"t-avatar\"><!-- your item --></div>\n" +
+            "      <div class=\"t-avatar\"><!-- your item --></div>\n" +
+            "      <!-- … -->\n" +
+            "    </div>\n" +
+            "\n" +
+            "  Wire-up (vanilla JS):\n" +
+            "    On `mouseenter` of any .t-avatar, walk every sibling and\n" +
+            "    set inline:\n" +
+            "      el.style.setProperty('--shift',\n" +
+            "        (lift * Math.pow(falloff, distance)).toFixed(3) + 'px');\n" +
+            "      el.style.setProperty('--scale-active',\n" +
+            "        i === activeIdx ? scale : 1);\n" +
+            "    Set transition-timing-function inline BEFORE the\n" +
+            "    variable writes — use --avatar-ease-in on hover-in and\n" +
+            "    --avatar-ease-out on the root's `mouseleave` (resets\n" +
+            "    --shift to 0 and --scale-active to 1).",
+          vars: [
+            ["--avatar-lift",     "--p11-lift"],
+            ["--avatar-dur",      "--p11-dur"],
+            ["--avatar-scale",    "--p11-scale"],
+            ["--avatar-falloff",  "--p11-falloff"],
+            ["--avatar-ease-in",  "--p11-ease-in"],
+            ["--avatar-ease-out", "--p11-ease-out"]
+          ],
+          css:
+            "/* Hover-spring transition only — bring your own avatar/chip\n" +
+            "   styling (size, shape, border, stacking, background). */\n" +
+            ".t-avatar {\n" +
+            "  transform-origin: center;\n" +
+            "  /* translateY before scale so scale doesn't amplify the lift offset. */\n" +
+            "  transform:\n" +
+            "    translateY(var(--shift, 0px))\n" +
+            "    scale(var(--scale-active, 1));\n" +
+            "  transition: transform var(--avatar-dur) var(--avatar-ease-in);\n" +
+            "  will-change: transform;\n" +
+            "}\n" +
+            "\n" +
+            "@media (prefers-reduced-motion: reduce) {\n" +
+            "  .t-avatar { transition: none !important; transform: none !important; }\n" +
+            "}"
+        },
+
+        p12: {
+          name: "Error state shake",
+          usage:
+            "    <!-- Apply .t-input-wrap to your wrapper, .t-input to the\n" +
+            "         element that should shake (your input field, its\n" +
+            "         bordered wrapper — whatever owns the visible border),\n" +
+            "         and .t-error-msg to the message you want to reveal.\n" +
+            "         Bring your own sizing, padding, border colors, and\n" +
+            "         typography. -->\n" +
+            "    <div class=\"t-input-wrap\">\n" +
+            "      <div class=\"t-input\">\n" +
+            "        <input type=\"text\">\n" +
+            "      </div>\n" +
+            "      <p class=\"t-error-msg\">Please enter a valid email.</p>\n" +
+            "    </div>\n" +
+            "\n" +
+            "  Trigger:\n" +
+            "    - Add `.is-error` to .t-input-wrap and .t-input. Your\n" +
+            "      own border-color rules drive the visible color; this\n" +
+            "      stylesheet only owns the tween.\n" +
+            "    - Restart the shake by removing `.is-shaking` from\n" +
+            "      .t-input, forcing a reflow, then re-adding it.\n" +
+            "    - Optional: after --revert-hold ms, drop both\n" +
+            "      `.is-error` classes so border + message fade back\n" +
+            "      to neutral over --revert-dur.\n" +
+            "\n" +
+            "  Per-segment ease: each keyframe stop carries its own\n" +
+            "  animation-timing-function so each leg follows the Figma\n" +
+            "  cubic-bezier curve independently.",
+          vars: [
+            ["--shake-distance",  "--p12-shake-distance"],
+            ["--shake-overshoot", "--p12-shake-overshoot"],
+            ["--shake-dur-a",     "--p12-shake-dur-a"],
+            ["--shake-dur-b",     "--p12-shake-dur-b"],
+            ["--shake-ease",      "--p12-shake-ease"],
+            ["--revert-hold",     "--p12-revert-hold"],
+            ["--revert-dur",      "--p12-revert-dur"]
+          ],
+          css:
+            "/* Border-color tween. Define your input's default / focused\n" +
+            "   / error border-color in your own component CSS — this rule\n" +
+            "   only owns the interpolation. Use a constant border-width\n" +
+            "   across states so the tween never shifts inner content. */\n" +
+            ".t-input {\n" +
+            "  transition: border-color 150ms ease-out;\n" +
+            "  will-change: transform;\n" +
+            "}\n" +
+            ".t-input.is-error {\n" +
+            "  /* Error border auto-reverts on the hold timer, so the\n" +
+            "     fade-out uses the slower revert duration (matches the\n" +
+            "     message fade). */\n" +
+            "  transition: border-color var(--revert-dur, 280ms) ease-out;\n" +
+            "}\n" +
+            "\n" +
+            "/* Error message reveal. Visibility is delayed by --revert-dur\n" +
+            "   on hide so the message stays painted for the full opacity\n" +
+            "   fade-out. Entering .is-error drops the delay to 0 so the\n" +
+            "   message becomes visible immediately. */\n" +
+            ".t-error-msg {\n" +
+            "  opacity: 0;\n" +
+            "  visibility: hidden;\n" +
+            "  transition:\n" +
+            "    opacity    var(--revert-dur, 280ms) ease-out,\n" +
+            "    visibility 0s linear var(--revert-dur, 280ms);\n" +
+            "}\n" +
+            ".t-input-wrap.is-error .t-error-msg {\n" +
+            "  opacity: 1;\n" +
+            "  visibility: visible;\n" +
+            "  transition:\n" +
+            "    opacity    var(--revert-dur, 280ms) ease-out,\n" +
+            "    visibility 0s linear 0s;\n" +
+            "}\n" +
+            "\n" +
+            "/* Multi-segment keyframe with per-stop easing so each leg\n" +
+            "   of the shake follows its own cubic-bezier independently.\n" +
+            "   %-stops are cumulative durations as a fraction of the\n" +
+            "   total (80, 60, 80, 60 = 280ms): 28.57%, 57.14%, 78.57%,\n" +
+            "   100%. Recompute if any segment duration changes. */\n" +
+            ".t-input.is-shaking {\n" +
+            "  animation: t-input-shake calc(\n" +
+            "      var(--shake-dur-a) * 2 + var(--shake-dur-b) * 2\n" +
+            "    ) linear;\n" +
+            "}\n" +
+            "@keyframes t-input-shake {\n" +
+            "  0%      { transform: translateX(0);                                 animation-timing-function: var(--shake-ease); }\n" +
+            "  28.57%  { transform: translateX(var(--shake-distance));             animation-timing-function: var(--shake-ease); }\n" +
+            "  57.14%  { transform: translateX(calc(var(--shake-distance) * -1)); animation-timing-function: var(--shake-ease); }\n" +
+            "  78.57%  { transform: translateX(var(--shake-overshoot));            animation-timing-function: var(--shake-ease); }\n" +
+            "  100%    { transform: translateX(0); }\n" +
+            "}\n" +
+            "\n" +
+            "@media (prefers-reduced-motion: reduce) {\n" +
+            "  .t-input { animation: none !important; transform: none !important; }\n" +
+            "}"
         }
       };
 
@@ -3693,12 +4802,15 @@ export function NumberPopIn({ value = "123" }) {
           document.body.classList.add("is-modal-open");
           lastTrigger = card;
 
-          // Cancel any pending close and rebuild from the resting state
-          // (scale(--p7-scale), opacity 0) before flipping to .is-open so
-          // the transform transition runs cleanly.
+          // Cancel pending close work, rebuild from the closed pose,
+          // then add `.is-open` and let CSS animate to the open pose.
+          // The dialog's base CSS carries the OPEN transition definition,
+          // so the browser uses it (after-change style wins) when the
+          // property values change due to the class flip — no
+          // `transition: none` flip-flop, no extra reset/opening states.
           if (closeTimer) { window.clearTimeout(closeTimer); closeTimer = null; }
-          root.classList.remove("is-closing");
           root.classList.remove("is-open");
+          root.classList.remove("is-closing");
           void root.offsetWidth;
           root.classList.add("is-open");
 
@@ -3709,9 +4821,10 @@ export function NumberPopIn({ value = "123" }) {
 
         function closeModal() {
           if (!root.classList.contains("is-open")) return;
-          // Hand off from .is-open → .is-closing, mirroring the P7 modal
-          // state machine: scale out to --p7-scale-close + fade opacity
-          // over --p7-close-dur, then clear state.
+          // Hand off from .is-open → .is-closing.
+          // Desktop uses the P7 scale+fade close;
+          // mobile (<=639px) uses panel-reveal close
+          // (translateY(200px) + fade + cross-blur).
           root.classList.remove("is-open");
           root.classList.add("is-closing");
           root.setAttribute("aria-hidden", "true");
@@ -3719,11 +4832,14 @@ export function NumberPopIn({ value = "123" }) {
           resetCopy();
 
           if (closeTimer) window.clearTimeout(closeTimer);
+          // Reads --proto-modal-close-dur:
+          //   desktop  → --p7-close-dur (150ms tween)
+          //   mobile   → --p3-close-dur (350ms tween)
           closeTimer = window.setTimeout(function () {
             root.classList.remove("is-closing");
             currentKey = null;
             closeTimer = null;
-          }, readMs("--p7-close-dur", 150));
+          }, readMs("--proto-modal-close-dur", 150));
 
           if (lastTrigger && typeof lastTrigger.focus === "function") {
             try { lastTrigger.focus({ preventScroll: true }); } catch (e) {}
@@ -3911,6 +5027,64 @@ export function NumberPopIn({ value = "123" }) {
               }
               break;
             }
+            case "10": {
+              var check = card.querySelector("[data-proto-check]");
+              if (!check) break;
+              // Toggle "in" / "out". On "in" → "out" we add .is-exiting
+              // briefly so the soft fade-out animations play; the cold
+              // "out" state never runs the exit. To replay "in" cleanly
+              // on rapid re-triggers we re-set data-state with a forced
+              // reflow so the keyframes restart from offset 0.
+              var p10State = check.getAttribute("data-state");
+              if (p10State === "in") {
+                check.classList.add("is-exiting");
+                check.setAttribute("data-state", "out");
+                var p10Out = readMs("--p10-out-dur", 500);
+                window.setTimeout(function () {
+                  check.classList.remove("is-exiting");
+                }, p10Out + 20);
+              } else {
+                check.classList.remove("is-exiting");
+                check.setAttribute("data-state", "out");
+                void check.offsetWidth;
+                check.setAttribute("data-state", "in");
+              }
+              break;
+            }
+            case "12": {
+              var wrap = card.querySelector("[data-proto-shake]");
+              if (!wrap) break;
+              var input = wrap.querySelector(".p12-input");
+              var inputEl = wrap.querySelector(".p12-input-el");
+              if (!input || !inputEl) break;
+              // Always trigger the error state on click — this is the
+              // demo, not real validation. Replay the shake by removing
+              // the class, forcing reflow, then re-adding.
+              wrap.classList.add("is-error");
+              input.classList.add("is-error");
+              input.classList.remove("is-shaking");
+              void input.offsetWidth;
+              input.classList.add("is-shaking");
+              var shakeMs =
+                readMs("--p12-shake-dur-a", 80) * 2 +
+                readMs("--p12-shake-dur-b", 60) * 2;
+              window.setTimeout(function () {
+                input.classList.remove("is-shaking");
+              }, shakeMs + 20);
+              // Auto-revert: hold the error state long enough to read
+              // the message (--p12-revert-hold), then fade border +
+              // message back to neutral via CSS (--p12-revert-dur).
+              // A previous in-flight revert is cancelled so the timer
+              // always tracks the latest Animate.
+              if (wrap._revertTimer) window.clearTimeout(wrap._revertTimer);
+              var hold = readMs("--p12-revert-hold", 3000);
+              wrap._revertTimer = window.setTimeout(function () {
+                wrap._revertTimer = null;
+                wrap.classList.remove("is-error");
+                input.classList.remove("is-error");
+              }, shakeMs + hold);
+              break;
+            }
             case "9": {
               var p9 = card.querySelector("[data-proto-number]");
               if (!p9) break;
@@ -4007,6 +5181,92 @@ export function NumberPopIn({ value = "123" }) {
           }
         }
       });
+
+      /* Prototype 11: avatar group hover spring.
+         Each avatar reads --p11-shift / --p11-scale-active inline;
+         on mouseenter we compute the shift for every sibling using
+         a power-falloff (lift * pow(falloff, distance)) so closer
+         neighbors lift more than far ones. The directly-hovered
+         avatar additionally scales to var(--p11-scale).
+         Direction-aware easing is achieved by writing
+         transition-timing-function inline BEFORE each variable
+         update: ease-in on the lift, ease-out (bouncy) on the
+         return. The browser starts a new transition the moment
+         --p11-shift / --p11-scale-active changes, picking up the
+         freshly-set timing-function for that interpolation only.
+         All knobs are re-read on every event so live tweaks to
+         the CSS variables apply without a page reload. */
+      (function initP11() {
+        var roots = document.querySelectorAll("[data-proto-avatars]");
+        if (!roots.length) return;
+        var docEl = document.documentElement;
+        function readNum(name, fb) {
+          var v = parseFloat(getComputedStyle(docEl).getPropertyValue(name));
+          return isNaN(v) ? fb : v;
+        }
+        function readEase(name, fb) {
+          var v = getComputedStyle(docEl).getPropertyValue(name).trim();
+          return v || fb;
+        }
+        roots.forEach(function (root) {
+          var avatars = Array.prototype.slice.call(
+            root.querySelectorAll(".p11-avatar")
+          );
+          function setShifts(activeIdx, phase) {
+            var lift    = readNum("--p11-lift", -4);
+            var falloff = readNum("--p11-falloff", 0.45);
+            var scale   = readNum("--p11-scale", 1.05);
+            var ease    = phase === "out"
+              ? readEase("--p11-ease-out", "cubic-bezier(0.34, 3.85, 0.64, 1)")
+              : readEase("--p11-ease-in",  "cubic-bezier(0.22, 1, 0.36, 1)");
+            avatars.forEach(function (el, i) {
+              // Set timing-function FIRST so it applies to the
+              // transition kicked off by the variable writes below.
+              el.style.transitionTimingFunction = ease;
+              if (activeIdx == null) {
+                el.style.setProperty("--p11-shift", "0px");
+                el.style.setProperty("--p11-scale-active", "1");
+                return;
+              }
+              var d = Math.abs(i - activeIdx);
+              el.style.setProperty(
+                "--p11-shift",
+                (lift * Math.pow(falloff, d)).toFixed(3) + "px"
+              );
+              el.style.setProperty(
+                "--p11-scale-active",
+                i === activeIdx ? scale.toString() : "1"
+              );
+            });
+          }
+          avatars.forEach(function (el, i) {
+            el.addEventListener("mouseenter", function () { setShifts(i, "in"); });
+          });
+          root.addEventListener("mouseleave", function () { setShifts(null, "out"); });
+        });
+      })();
+
+      /* Prototype 12: typing into the input cancels the auto-revert
+         and clears the error state. Mirrors prototypes.html behaviour
+         so the demo doesn't shake again over a value the user has
+         already started correcting. */
+      (function initP12() {
+        var wraps = document.querySelectorAll("[data-proto-shake]");
+        if (!wraps.length) return;
+        wraps.forEach(function (wrap) {
+          var input = wrap.querySelector(".p12-input");
+          var el = wrap.querySelector(".p12-input-el");
+          if (!input || !el) return;
+          el.addEventListener("input", function () {
+            if (wrap._revertTimer) {
+              window.clearTimeout(wrap._revertTimer);
+              wrap._revertTimer = null;
+            }
+            wrap.classList.remove("is-error");
+            input.classList.remove("is-error");
+          });
+        });
+      })();
 
       /* Build the hover tooltip for every copy button once on load.
          The tooltip reads "Cop" + a swap slot that holds both "y"
