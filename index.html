@@ -2209,32 +2209,48 @@
 
     @media (max-width: 740px) {
       .cards { grid-template-columns: 320px; gap: 16px; }
-      /* Keep the divider on the left and stack only the copy + pill
-         vertically. Tighten margins to feel less roomy on small
-         viewports. */
+      /* Mobile re-layout uses CSS grid so the left divider can occupy
+         only the text row instead of stretching across the button row.
+         `.course-cta-inner` is `display: contents` here so its
+         children participate directly in the grid:
+           [ divider ] [ text   ]   ← row 1
+                       [ button ]   ← row 2
+         Re-enable .course-cta-inner as a flex container on desktop
+         (it stays unchanged outside this @media block). */
       .course-cta {
-        align-items: stretch;
-        /* Reduce left gutter so the CTA block stays visually centered
-           relative to the 320px cards while the divider remains pinned
-           on the left edge. */
-        gap: 10px;
+        display: grid;
+        grid-template-columns: 2px 1fr;
+        column-gap: 10px;
+        row-gap: 16px;
+        align-items: start;
         max-width: 320px;
         margin: 56px auto;
       }
-      .course-cta-inner {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 16px;
-        flex: 1 1 auto;
-        min-width: 0;
+      .course-cta-divider {
+        grid-column: 1;
+        grid-row: 1;
+        align-self: stretch;
+        height: auto;
+        width: 2px;
       }
-      .course-cta-divider { height: auto; align-self: stretch; }
-      .course-cta-text { max-width: none; }
-      /* On mobile the inner is a column, so the desktop's
-         margin-left: auto would push the button to the right edge of
-         the column — reset it so the button hugs the start. */
-      .course-cta-button { margin-left: 0; }
+      .course-cta-inner {
+        display: contents;
+      }
+      .course-cta-text {
+        grid-column: 2;
+        grid-row: 1;
+        max-width: none;
+      }
+      /* Span both columns on row 2 so the pill's left edge lines up
+         with the divider's left edge (not with the text in column 2).
+         `justify-self: start` keeps the pill at its intrinsic content
+         width — without it grid items would stretch to fill the row. */
+      .course-cta-button {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        justify-self: start;
+        margin-left: 0;
+      }
     }
 
     @media (max-width: 639px) {
