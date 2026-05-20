@@ -239,6 +239,8 @@
     body[data-embed="true"] {
       background: transparent;
       min-height: 0;
+      width: 100%;
+      overflow-x: hidden;
     }
     body[data-embed="true"] .toolbar { display: none; }
     body[data-embed="true"] .modal-backdrop { display: none; }
@@ -250,39 +252,23 @@
       justify-content: center;
       width: 100%;
       min-height: 100vh;
-      padding: 24px 0;
+      padding: 24px 16px;
+      box-sizing: border-box;
+      overflow: hidden;
     }
     body[data-embed="true"] .modal-card {
       position: relative;
       left: auto;
       top: auto;
-      transform: none;
-    }
-    /* Narrow embed viewports — the modal's fixed 425px layout
-       won't fit the iframe width on mobile, so visually scale the
-       whole modal down via transform around its centre. The flex
-       layout box still measures 425×389 (rewriting every absolutely
-       positioned child for fluid widths would be a much bigger job
-       and would break the pixel-perfect Figma layout) but overflow:
-       hidden on body + modal-root contains the oversized box
-       cleanly. Threshold is 457px — the modal's 425px plus the
-       requested 16px breathing room on each side; above that the
-       modal renders at full 1:1 scale. Scale floor of 0.5 stops
-       the modal from collapsing into illegibility on absurdly
-       narrow embeds. */
-    @media (max-width: 457px) {
-      body[data-embed="true"] { overflow: hidden; }
-      body[data-embed="true"] .modal-root { overflow: hidden; }
-      body[data-embed="true"] .modal-card {
-        /* 32px subtracted from 100vw → 16px margin on each side
-           between the scaled modal and the iframe edge. Dividing
-           by 425px (a length, not the unitless 425) so the calc
-           collapses length/length → unitless ratio that scale()
-           accepts. clamp() pins the ratio between 0.5 (illegibility
-           floor) and 1 (so the modal never up-scales past native). */
-        transform: scale(clamp(0.5, calc((100vw - 32px) / 425px), 1));
-        transform-origin: center center;
-      }
+      /* --embed-modal-scale is set by JS from window.innerWidth.
+         CSS @media + 100vw is unreliable inside iframes on iOS
+         Safari (the inner document can report a wider layout
+         viewport than the visible iframe width), so we compute
+         the ratio in initEmbed instead and always keep 16px of
+         breathing room on each side via the modal-root padding
+         above plus the scale math below. */
+      transform: scale(var(--embed-modal-scale, 1));
+      transform-origin: center center;
     }
 
     /* "Generic AI output" style — strip all of the calibrated
@@ -1199,21 +1185,39 @@
        baked into --shadow-modal, so we just need to retune the size
        and rhythm here.
        ────────────────────────────────────────────────────────────── */
-    .access-menu {
+    /* Access-level dropdown shell — carries the box-shadow on a
+       layer that never receives the scale transform. Safari defers
+       painting box-shadow on an element that is mid-scale-animation
+       (~150-200 ms late); splitting shadow (shell) from transform
+       (inner .access-menu) is the reliable fix. Positioning
+       (left/top) is applied to the shell; .t-dropdown animation
+       runs on the inner menu only. */
+    .access-menu-shell {
       position: fixed;
+      z-index: 50;
+      visibility: hidden;
+      pointer-events: none;
+      border-radius: 14px;
+      box-shadow: var(--shadow-modal);
+      overflow: hidden;
+    }
+    .access-menu-shell.is-open,
+    .access-menu-shell.is-closing {
+      visibility: visible;
+      pointer-events: auto;
+    }
+    .access-menu {
+      position: relative;
+      left: auto;
+      top: auto;
       width: 188px;
       padding: 4px;
       background: var(--bg-modal);
       border-radius: 14px;
-      box-shadow: var(--shadow-modal);
+      box-shadow: none;
       z-index: 50;
-      /* Visibility is owned by .t-dropdown (opacity/scale). We still
-         park the menu off-screen when fully closed so its bounding
-         box doesn't intercept clicks. */
-      visibility: hidden;
+      visibility: visible;
     }
-    .access-menu.is-open,
-    .access-menu.is-closing { visibility: visible; }
     .access-option {
       width: 100%;
       height: 36px;
@@ -1248,6 +1252,9 @@
        rows with the same radius as the container, and a one-step
        larger label so the text doesn't feel undersized against the
        lower-contrast surface. */
+    html[data-theme="dark"] .access-menu-shell {
+      border-radius: 12px;
+    }
     html[data-theme="dark"] .access-menu {
       padding: 8px;
       border-radius: 12px;
@@ -1770,8 +1777,10 @@
     </section>
   </div>
 
-  <!-- Floating access-level menu (positioned at runtime). Carries
-       t-dropdown so it scales up from the trigger on open. -->
+  <!-- Floating access-level menu (positioned at runtime). Shadow
+       lives on .access-menu-shell; scale animation on inner .t-dropdown
+       so Safari paints the drop-shadow from frame 1. -->
+  <div class="access-menu-shell" id="accessMenuShell" aria-hidden="true">
   <div class="t-dropdown access-menu" id="accessMenu" data-open="false" data-origin="top-right" role="menu" aria-label="Access levels">
     <button class="access-option" type="button" data-value="Full access">
       <span>Full access</span><span class="check icon icon-check"></span>
@@ -1782,6 +1791,7 @@
     <button class="access-option" type="button" data-value="View only">
       <span>View only</span><span class="check icon icon-check"></span>
     </button>
+  </div>
   </div>
 
   <script>
@@ -1921,6 +1931,7 @@
     const publishCopy     = $('publishCopy');
     const pageStage       = $('pageStage');
     const accessMenu      = $('accessMenu');
+    const accessMenuShell = $('accessMenuShell');
 
     /* Initial icon paint. Inline SVGs that need theme colours read
        currentColor on their fills/strokes, so the body's text colour
@@ -2455,16 +2466,22 @@
     const dropdownCloseMs = parseFloat(
       getComputedStyle(document.documentElement).getPropertyValue('--dropdown-close-dur')
     ) || 150;
+    function syncAccessShell(open, closing) {
+      accessMenuShell.classList.toggle('is-open', open);
+      accessMenuShell.classList.toggle('is-closing', closing);
+      accessMenuShell.setAttribute('aria-hidden', open || closing ? 'false' : 'true');
+    }
     function closeMenu() {
       if (accessMenu.dataset.open !== 'true' && !accessMenu.classList.contains('is-open')) return;
       accessMenu.dataset.open = 'false';
       accessMenu.classList.remove('is-open');
       accessMenu.classList.add('is-closing');
+      syncAccessShell(false, true);
       clearTimeout(closeMenu._t);
-      closeMenu._t = setTimeout(
-        () => accessMenu.classList.remove('is-closing'),
-        dropdownCloseMs
-      );
+      closeMenu._t = setTimeout(() => {
+        accessMenu.classList.remove('is-closing');
+        syncAccessShell(false, false);
+      }, dropdownCloseMs);
       if (activeAccessOwner) {
         const btn = document.querySelector('[data-access-owner="' + activeAccessOwner + '"]');
         if (btn) btn.setAttribute('aria-expanded', 'false');
@@ -2482,13 +2499,13 @@
       // invisible. Padding+3 rows at 36px = ~116 in light mode, but
       // dark mode's chunkier rhythm bumps that to ~136 — measuring
       // keeps the upward flip honest across themes.
-      const prevVis = accessMenu.style.visibility;
-      const prevDisp = accessMenu.style.display;
-      accessMenu.style.visibility = 'hidden';
-      accessMenu.style.display = 'block';
+      const prevVis = accessMenuShell.style.visibility;
+      const prevDisp = accessMenuShell.style.display;
+      accessMenuShell.style.visibility = 'hidden';
+      accessMenuShell.style.display = 'block';
       const menuH = accessMenu.offsetHeight;
-      accessMenu.style.visibility = prevVis;
-      accessMenu.style.display = prevDisp;
+      accessMenuShell.style.visibility = prevVis;
+      accessMenuShell.style.display = prevDisp;
       // Flip the dropdown above the trigger when there isn't enough
       // room below in the viewport (the modal is embedded in a
       // 460px iframe on the skill page, so general-access triggers
@@ -2503,11 +2520,12 @@
         ? Math.round(r.top - gap - menuH)
         : Math.round(r.bottom + gap);
       // Right-align the 188px menu with the anchor's right edge.
-      accessMenu.style.left = Math.round(r.right - 188) + 'px';
-      accessMenu.style.top  = top + 'px';
+      accessMenuShell.style.left = Math.round(r.right - 188) + 'px';
+      accessMenuShell.style.top  = top + 'px';
       accessMenu.setAttribute('data-origin', openUp ? 'bottom-right' : 'top-right');
       accessMenu.dataset.open = 'true';
       accessMenu.classList.remove('is-closing');
+      syncAccessShell(true, false);
       // Force a layout read so the scale(pre) baseline is applied
       // before .is-open swaps it to scale(1) — keeps the open
       // animation from skipping its first frame after a close.
@@ -2538,7 +2556,7 @@
         closeMenu();
         return;
       }
-      if (!e.target.closest('#accessMenu')) closeMenu();
+      if (!e.target.closest('#accessMenu') && !e.target.closest('#accessMenuShell')) closeMenu();
     });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
 
@@ -2629,6 +2647,40 @@
       if (initialTheme === 'dark' || initialTheme === 'light') {
         applyTheme(initialTheme);
       }
+
+      /* Scale the fixed 425px modal to fit the iframe with 16px
+         side margins. window.innerWidth is reliable inside iframes on
+         iOS Safari; CSS 100vw / @media often is not. */
+      const EMBED_MODAL_W = 425;
+      const EMBED_SIDE_MARGIN = 16;
+      const EMBED_SCALE_MIN = 0.5;
+      function updateEmbedModalScale() {
+        const card = document.querySelector('.modal-card');
+        const root = document.querySelector('.modal-root');
+        if (!card) return;
+        const avail = Math.max(0, window.innerWidth - EMBED_SIDE_MARGIN * 2);
+        const scale = Math.min(
+          1,
+          Math.max(EMBED_SCALE_MIN, avail / EMBED_MODAL_W)
+        );
+        document.documentElement.style.setProperty(
+          '--embed-modal-scale',
+          String(scale)
+        );
+        if (root) {
+          const visualH = card.offsetHeight * scale;
+          root.style.minHeight = Math.ceil(visualH + 48) + 'px';
+        }
+      }
+      updateEmbedModalScale();
+      window.addEventListener('resize', updateEmbedModalScale);
+      if (typeof ResizeObserver !== 'undefined') {
+        const card = document.querySelector('.modal-card');
+        if (card) {
+          new ResizeObserver(updateEmbedModalScale).observe(card);
+        }
+      }
+
       window.addEventListener('message', (event) => {
         const data = event.data;
         if (!data) return;
