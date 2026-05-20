@@ -93,10 +93,15 @@
       --p5-ease: ease-in-out;
 
       /* P6 — Text enter/exit */
-      --p6-dur: 200ms;
-      --p6-translate-y: 8px;
+      --p6-dur: 150ms;
+      --p6-translate-y: 4px;
       --p6-blur: 2px;
-      --p6-ease: ease-out;
+      --p6-ease: ease-in-out;
+      /* Offset between the exit phase finishing and the enter phase
+         starting. 0 = back-to-back (old default). Positive values add
+         a gap so the stage briefly sits empty. Negative values pull
+         the enter earlier so it cross-fades with the exit. */
+      --p6-enter-delay: 0ms;
 
       /* P7 — Modal open/close (scale + opacity, Figma skeleton 261×172) */
       --p7-open-dur: 250ms;
@@ -2031,8 +2036,9 @@
           <span class="cp-section-title">4. Text swap</span>
           <button type="button" class="cp-export">Export</button>
         </header>
-        <div class="cp-row"><span class="cp-label">Duration (ms)</span><input type="number" data-var="--p6-dur" data-unit="ms" min="0" max="2000" step="10" value="200"></div>
-        <div class="cp-row"><span class="cp-label">Translate Y (px)</span><input type="number" data-var="--p6-translate-y" data-unit="px" min="0" max="40" step="1" value="8"></div>
+        <div class="cp-row"><span class="cp-label">Duration (ms)</span><input type="number" data-var="--p6-dur" data-unit="ms" min="0" max="2000" step="10" value="150"></div>
+        <div class="cp-row"><span class="cp-label">Enter delay (ms)</span><input type="number" data-var="--p6-enter-delay" data-unit="ms" min="-2000" max="2000" step="10" value="0"></div>
+        <div class="cp-row"><span class="cp-label">Translate Y (px)</span><input type="number" data-var="--p6-translate-y" data-unit="px" min="0" max="40" step="1" value="4"></div>
         <div class="cp-row"><span class="cp-label">Blur (px)</span><input type="number" data-var="--p6-blur" data-unit="px" min="0" max="20" step="0.5" value="2"></div>
         <div class="cp-row"><span class="cp-label">Ease</span><select class="cp-ease" data-var="--p6-ease"></select></div>
         <div class="cp-row-ease-raw"><input type="text" class="cp-ease-text" data-var="--p6-ease" spellcheck="false" aria-label="Ease value"></div>
@@ -2444,6 +2450,17 @@
             if (p6Busy) return;
             p6Busy = true;
             const p6Dur = readMs("--p6-dur", 200);
+            // Signed offset between exit-finish and enter-start.
+            //   delay > 0 → gap (stage briefly empty, exit then pause then enter)
+            //   delay = 0 → back-to-back (legacy behaviour)
+            //   delay < 0 → overlap (enter starts before exit ends; the
+            //               cross-fade is invisible because both phases sit
+            //               at opacity:0 mid-swap, so it reads as a
+            //               continuous animation with a longer tail).
+            // The swap moment is clamped to ≥ 0 so a large negative
+            // offset can't schedule the swap in the past.
+            const p6Delay = readMs("--p6-enter-delay", 0);
+            const swapAt = Math.max(0, p6Dur + p6Delay);
             // Exit phase
             p6Text.classList.add("is-exit");
             window.setTimeout(function () {
@@ -2461,7 +2478,7 @@
               window.setTimeout(function () {
                 p6Busy = false;
               }, p6Dur);
-            }, p6Dur);
+            }, swapAt);
             break;
           }
           case "10": {

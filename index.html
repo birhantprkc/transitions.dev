@@ -244,10 +244,11 @@
       --p5-ease: ease-in-out;
 
       /* P6 — Text enter/exit */
-      --p6-dur: 200ms;
-      --p6-translate-y: 8px;
+      --p6-dur: 150ms;
+      --p6-enter-delay: 0ms;
+      --p6-translate-y: 4px;
       --p6-blur: 2px;
-      --p6-ease: ease-out;
+      --p6-ease: ease-in-out;
 
       /* P7 — Modal open/close */
       --p7-open-dur: 250ms;
@@ -496,6 +497,54 @@
       height: 17px;
     }
     .icon-btn:hover svg { color: var(--icon-color); }
+
+    /* Pill variant of .icon-btn: 36px tall, holds an icon + label.
+       Used by the "Skill" link that jumps from the homepage to
+       skill.html. Reuses the same chip-bg tokens as .icon-btn so
+       theme tracking is automatic. */
+    .icon-btn-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      height: 36px;
+      width: auto;
+      min-width: 36px;
+      padding: 0 13px;
+      border: 0;
+      border-radius: 50px;
+      background: var(--chip-bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 16px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background-color 0.15s ease, color 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .icon-btn-pill:hover { background: var(--chip-bg-hover); }
+    .icon-btn-pill:active { background: var(--chip-bg-pressed); }
+    .icon-btn-pill:focus-visible {
+      outline: 2px solid var(--icon-color);
+      outline-offset: 2px;
+    }
+    /* Height-capped so non-square icons (e.g. the 14×16 "Skill"
+       book) keep their native aspect ratio. */
+    .icon-btn-pill svg {
+      width: auto;
+      height: 16px;
+      max-width: 16px;
+      display: block;
+      color: var(--icon-color-muted);
+      transition: color 0.15s ease;
+    }
+    .icon-btn-pill:hover svg { color: var(--icon-color); }
+    .icon-btn-pill .pill-label {
+      display: inline-block;
+      color: var(--text);
+    }
 
     /* Mirrors the P5 "Icon swap" prototype architecture: both icons
        live permanently in the DOM stacked on top of each other, and
@@ -2275,6 +2324,10 @@
     @media (max-width: 639px) {
       .app { padding: 0 20px 48px; }
       .top-bar { right: 20px; top: 12px; }
+      /* On phones the Skill pill collapses to a 36px icon so the
+         row doesn't get crowded next to the theme/GitHub/X icons. */
+      .icon-btn-pill .pill-label { display: none; }
+      .icon-btn-pill { width: 36px; padding: 0; min-width: 36px; }
       .header {
         height: auto;
         min-height: 180px;
@@ -2687,6 +2740,26 @@
 
   <main id="main" class="app">
     <nav class="top-bar" aria-label="Page actions">
+      <!-- Skill pill — entry point to the dedicated /skill.html page.
+           Uses the exact Figma 450:487 "e-reader" SVG (14×16 viewBox)
+           so the icon proportions match the design pixel-for-pixel. -->
+      <a
+        class="icon-btn-pill"
+        href="skill.html"
+        aria-label="Open Transitions.dev Skill page"
+      >
+        <svg
+          aria-hidden="true"
+          width="14"
+          height="16"
+          viewBox="0 0 14 16"
+          fill="currentColor"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path d="M12 0H2C1.46957 0 0.960859 0.210714 0.585786 0.585786C0.210714 0.960859 0 1.46957 0 2V14C0 14.5304 0.210714 15.0391 0.585786 15.4142C0.960859 15.7893 1.46957 16 2 16H12C12.5304 16 13.0391 15.7893 13.4142 15.4142C13.7893 15.0391 14 14.5304 14 14V2C14 1.46957 13.7893 0.960859 13.4142 0.585786C13.0391 0.210714 12.5304 0 12 0ZM8 11H3V10H8V11ZM11 8H3V7H11V8ZM11 5H3V4H11V5Z" />
+        </svg>
+        <span class="pill-label">Skill</span>
+      </a>
       <button
         type="button"
         class="icon-btn theme-toggle"
@@ -5003,7 +5076,16 @@ function readMs(name, fallback) {
               if (p6Busy) return;
               p6Busy = true;
               var t = card.querySelector("[data-proto-text]");
-              var dur = readMs("--p6-dur", 200);
+              var dur = readMs("--p6-dur", 150);
+              // Signed offset between the exit-end and the enter-start.
+              //   > 0 → empty pause between the two phases
+              //   = 0 → back-to-back (default)
+              //   < 0 → overlap (cross-fade through opacity:0)
+              // Clamped to ≥ 0 so a large negative value just means
+              // "swap immediately" rather than scheduling a negative
+              // timeout.
+              var delay = readMs("--p6-enter-delay", 0);
+              var swapAt = Math.max(0, dur + delay);
               t.classList.add("is-exit");
               window.setTimeout(function () {
                 p6Index = (p6Index + 1) % p6Messages.length;
@@ -5013,7 +5095,7 @@ function readMs(name, fallback) {
                 void t.offsetHeight;
                 t.classList.remove("is-enter-start");
                 window.setTimeout(function () { p6Busy = false; }, dur);
-              }, dur);
+              }, swapAt);
               break;
             }
             case "7": {
