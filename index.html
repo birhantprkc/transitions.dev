@@ -5485,13 +5485,14 @@ function readMs(name, fallback) {
        (anon, ~60 req/hr/IP — plenty for a single page visit).
        Cached in sessionStorage so soft-navigations within the
        same tab don't re-hit the API and so users on flaky
-       networks don't see the placeholder flash. Falls back
-       silently to "Star" on network / rate-limit errors — the
-       link itself always works. Mirrors the same pill on
-       /skill so both pages share the cache key. */
+       networks don't see the placeholder flash. Falls back to
+       shields.io when GitHub rate-limits, then stale cache, then
+       "Star" — the link itself always works. Mirrors the same
+       pill on /skill so both pages share the cache key. */
     (function () {
       var STAR_CACHE_KEY = "tdev:gh-stars";
       var STAR_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+      var STAR_REPO = "Jakubantalik/transitions.dev";
       var pill = document.getElementById("gh-stars-btn");
       var countEl = document.getElementById("gh-stars-count");
       if (!pill || !countEl) return;
@@ -5511,38 +5512,92 @@ function readMs(name, fallback) {
         );
       }
 
-      try {
-        var cached = sessionStorage.getItem(STAR_CACHE_KEY);
-        if (cached) {
+      function readStarCache(allowStale) {
+        try {
+          var cached = sessionStorage.getItem(STAR_CACHE_KEY);
+          if (!cached) return null;
           var parsed = JSON.parse(cached);
-          if (parsed && Date.now() - parsed.t < STAR_CACHE_TTL && Number.isFinite(parsed.n)) {
-            paintStars(parsed.n);
-          }
-        }
-      } catch (e) {}
+          if (!parsed || !Number.isFinite(parsed.n)) return null;
+          if (allowStale || Date.now() - parsed.t < STAR_CACHE_TTL) return parsed.n;
+        } catch (e) {}
+        return null;
+      }
 
-      if (window.fetch) {
-        fetch("https://api.github.com/repos/Jakubantalik/transitions.dev", {
+      function saveStarCache(n) {
+        try {
+          sessionStorage.setItem(
+            STAR_CACHE_KEY,
+            JSON.stringify({ n: n, t: Date.now() })
+          );
+        } catch (e) {}
+      }
+
+      function releaseStarLoading(fallbackLabel) {
+        if (!pill.hasAttribute("data-loading")) return;
+        if (fallbackLabel) countEl.textContent = fallbackLabel;
+        pill.removeAttribute("data-loading");
+      }
+
+      function parseShieldsStars(data) {
+        if (!data) return null;
+        var raw = data.message != null ? data.message : data.value;
+        if (raw == null) return null;
+        raw = String(raw).replace(/,/g, "");
+        if (/^\d+(?:\.\d+)?k$/i.test(raw)) {
+          return Math.round(parseFloat(raw) * 1000);
+        }
+        var n = parseInt(raw, 10);
+        return Number.isFinite(n) ? n : null;
+      }
+
+      var freshCache = readStarCache(false);
+      if (freshCache != null) paintStars(freshCache);
+
+      function fetchGitHubStars() {
+        if (!window.fetch) {
+          var stale = readStarCache(true);
+          if (stale != null) paintStars(stale);
+          else releaseStarLoading("Star");
+          return;
+        }
+
+        fetch("https://api.github.com/repos/" + STAR_REPO, {
           headers: { Accept: "application/vnd.github+json" }
         })
-          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (r) {
+            if (!r.ok) throw new Error("github " + r.status);
+            return r.json();
+          })
           .then(function (data) {
-            if (!data || !Number.isFinite(data.stargazers_count)) return;
+            if (!data || !Number.isFinite(data.stargazers_count)) {
+              throw new Error("github parse");
+            }
             paintStars(data.stargazers_count);
-            try {
-              sessionStorage.setItem(
-                STAR_CACHE_KEY,
-                JSON.stringify({ n: data.stargazers_count, t: Date.now() })
-              );
-            } catch (e) {}
+            saveStarCache(data.stargazers_count);
           })
           .catch(function () {
-            if (pill.hasAttribute("data-loading")) {
-              countEl.textContent = "Star";
-              pill.removeAttribute("data-loading");
-            }
+            return fetch(
+              "https://img.shields.io/github/stars/" + STAR_REPO + ".json"
+            )
+              .then(function (r) {
+                if (!r.ok) throw new Error("shields " + r.status);
+                return r.json();
+              })
+              .then(function (data) {
+                var n = parseShieldsStars(data);
+                if (n == null) throw new Error("shields parse");
+                paintStars(n);
+                saveStarCache(n);
+              });
+          })
+          .catch(function () {
+            var stale = readStarCache(true);
+            if (stale != null) paintStars(stale);
+            else releaseStarLoading("Star");
           });
       }
+
+      fetchGitHubStars();
     })();
   </script>
 </body>
