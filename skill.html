@@ -40,8 +40,8 @@
   <meta property="og:locale" content="en_US" />
   <meta property="og:title" content="Transitions.dev Skill — Teach your AI about product motion" />
   <meta property="og:description" content="Transitions.dev Skill teaches your AI about product motion. Works with Claude Code, Cursor, GitHub Copilot, Codex, and Gemini CLI." />
-  <meta property="og:image" content="https://transitions.dev/assets/og-image.jpg" />
-  <meta property="og:image:secure_url" content="https://transitions.dev/assets/og-image.jpg" />
+  <meta property="og:image" content="https://transitions.dev/assets/og-image-skill.jpg" />
+  <meta property="og:image:secure_url" content="https://transitions.dev/assets/og-image-skill.jpg" />
   <meta property="og:image:type" content="image/jpeg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
@@ -50,7 +50,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Transitions.dev Skill — Teach your AI about product motion" />
   <meta name="twitter:description" content="Transitions.dev Skill teaches your AI about product motion. Works with Claude Code, Cursor, GitHub Copilot, Codex, and Gemini CLI." />
-  <meta name="twitter:image" content="https://transitions.dev/assets/og-image.jpg" />
+  <meta name="twitter:image" content="https://transitions.dev/assets/og-image-skill.jpg" />
   <meta name="twitter:image:alt" content="Transitions.dev Skill — Teach your AI about product motion" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -86,7 +86,7 @@
           "inLanguage": "en",
           "primaryImageOfPage": {
             "@type": "ImageObject",
-            "url": "https://transitions.dev/assets/og-image.jpg",
+            "url": "https://transitions.dev/assets/og-image-skill.jpg",
             "width": 1200,
             "height": 630
           }
@@ -1360,13 +1360,21 @@
       flex-shrink: 0;
     }
 
+    /* Every transform value below carries a trailing translateZ(0)
+       to pre-promote the compositor layer. Safari has a long-
+       standing quirk where the .surface box-shadow on a scale-
+       animated element paints with a delay — WebKit defers the
+       layer's paint until the transform settles, so the shadow
+       snaps in ~150-200 ms after the open animation starts.
+       translateZ(0) forces the layer to be created with paint
+       ready from frame 1 so the shadow rides in with the rest. */
     .p2-dropdown {
       width: 234px;
       height: 136px;
       position: relative;
       padding: 8px;
       transform-origin: var(--p2-origin);
-      transform: scale(var(--p2-pre-scale));
+      transform: scale(var(--p2-pre-scale)) translateZ(0);
       opacity: 0;
       pointer-events: none;
       transition:
@@ -1374,10 +1382,10 @@
         opacity var(--p2-open-dur) var(--p2-ease);
     }
     .p2-dropdown.is-open {
-      transform: scale(1); opacity: 1; pointer-events: auto;
+      transform: scale(1) translateZ(0); opacity: 1; pointer-events: auto;
     }
     .p2-dropdown.is-closing {
-      transform: scale(var(--p2-closing-scale));
+      transform: scale(var(--p2-closing-scale)) translateZ(0);
       opacity: 0;
       pointer-events: none;
       transition:
@@ -1615,6 +1623,11 @@
     }
 
     /* ─── Prototype 7 — Modal open/close ─────────────────────── */
+    /* Same Safari shadow-paint quirk as .p2-dropdown above — see
+       that block for the full explanation. translateZ(0) on each
+       transform pre-promotes the compositor layer so the
+       box-shadow rides in with the scale animation instead of
+       snapping in late. */
     .p7-dropdown {
       width: 261px;
       height: 172px;
@@ -1624,7 +1637,7 @@
       position: relative;
       overflow: hidden;
       transform-origin: center;
-      transform: scale(var(--p7-scale));
+      transform: scale(var(--p7-scale)) translateZ(0);
       opacity: 0;
       pointer-events: none;
       transition:
@@ -1633,10 +1646,10 @@
       will-change: transform, opacity;
     }
     .p7-dropdown.is-open {
-      transform: scale(1); opacity: 1; pointer-events: auto;
+      transform: scale(1) translateZ(0); opacity: 1; pointer-events: auto;
     }
     .p7-dropdown.is-closing {
-      transform: scale(var(--p7-scale-close));
+      transform: scale(var(--p7-scale-close)) translateZ(0);
       opacity: 0;
       pointer-events: none;
       transition:
@@ -3253,7 +3266,7 @@
         <iframe
           id="skill-compare-iframe-off"
           class="skill-compare-iframe"
-          src="example.html?embed=1&style=generic&v=20260520"
+          src="example.html?embed=1&style=generic&v=20260520-2"
           title="Modal demo without Transitions.dev skill — no motion"
           loading="lazy"
         ></iframe>
@@ -3262,7 +3275,7 @@
         <iframe
           id="skill-compare-iframe"
           class="skill-compare-iframe"
-          src="example.html?embed=1&v=20260520"
+          src="example.html?embed=1&v=20260520-2"
           title="Modal demo built with Transitions.dev skill"
           loading="lazy"
         ></iframe>
@@ -3524,6 +3537,22 @@
             p.setAttribute("aria-hidden", isOn === !!on ? "false" : "true");
           });
         }
+        // Reset the publish state in BOTH iframes so each side of
+        // the comparison starts from a clean unpublished baseline
+        // every time the toggle flips. example.html listens for
+        // this message and hard-snaps publishedFlag back to false
+        // without any transition. Safe on initial page load too —
+        // the modal is already unpublished, so the message is a
+        // no-op (and if the iframe hasn't attached its listener
+        // yet, the message is just dropped).
+        ["skill-compare-iframe", "skill-compare-iframe-off"].forEach(function (id) {
+          var f = document.getElementById(id);
+          if (f && f.contentWindow) {
+            try {
+              f.contentWindow.postMessage({ type: "reset-publish" }, "*");
+            } catch (_) {}
+          }
+        });
       }
 
       if (sw) {
