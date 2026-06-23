@@ -2630,22 +2630,27 @@
       text-align: left;
       -webkit-tap-highlight-color: transparent;
     }
-    /* Rotate the chevron 180° to flip the "v" into a "^". Rotation works
-       in every browser, unlike CSS `d:` path morphing, which only
-       animates in Chromium (so it never moved on mobile Safari). */
+    /* Flip the chevron vertically to turn the "v" into a "^". scaleY(-1)
+       about the centre passes through a flat line at the midpoint —
+       reproducing the original `d:` path morph — but, unlike CSS `d:`
+       morphing (Chromium only), it animates in every browser including
+       mobile Safari. The path is symmetric about the 16×16 viewBox
+       centre, so the flip lands exactly on the "^" shape; non-scaling
+       -stroke keeps the stroke width constant through the flip. */
     .p21-chevron {
       flex: 0 0 auto;
       display: inline-flex;
       width: 16px;
       height: 16px;
       color: var(--muted);
-      transform: rotate(0deg);
+      transform: scaleY(1);
       transform-origin: center;
       transition: transform var(--p21-chevron-dur) var(--p21-ease);
     }
     .p21-chevron svg { display: block; }
+    .p21-chevron path { vector-effect: non-scaling-stroke; }
     .p21-item[data-open="true"] .p21-chevron {
-      transform: rotate(180deg);
+      transform: scaleY(-1);
     }
     /* grid-template-rows 0fr → 1fr gives a clean height animation
        with no JS measurement. The inner element clips the content. */

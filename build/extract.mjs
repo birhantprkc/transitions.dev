@@ -272,14 +272,14 @@ The plus button must overlay the panel, pinned to a corner (\`inset: auto 0 0 au
 
 The bouncy \`--morph-ease\` only drives the open; the close falls back to the calm \`--morph-close-ease\`. Don't collapse them into one variable. Adjust the open \`width\` / \`height\` in the snippet to your real panel size — they're hardcoded, not derived from the content.` },
   { key: "p21", file: "21-accordion", summary: "Grow / shrink a panel via grid-rows with a chevron flip",
-    when: "A disclosure / accordion / collapsible section whose panel grows and shrinks in height when toggled, with the header chevron flipping between a downward \"v\" and an upward \"^\". Use for settings groups, FAQs, filter sections, \"show more\" details — any header + collapsible body.\n\nHeight animates via `grid-template-rows: 0fr ↔ 1fr`, so there's **no JS height measuring** and content of any size animates cleanly. The chevron rotates 180° to flip the \"v\" into a \"^\".",
+    when: "A disclosure / accordion / collapsible section whose panel grows and shrinks in height when toggled, with the header chevron flipping between a downward \"v\" and an upward \"^\". Use for settings groups, FAQs, filter sections, \"show more\" details — any header + collapsible body.\n\nHeight animates via `grid-template-rows: 0fr ↔ 1fr`, so there's **no JS height measuring** and content of any size animates cleanly. The chevron flips vertically (`scaleY`) from a \"v\" to a \"^\", passing through a flat line at the midpoint.",
     notes: `### Two-element panel + padding placement
 
 The panel needs the two-element structure (\`.t-acc-panel\` grid track + \`.t-acc-panel-inner\` with \`overflow: hidden\`). The \`0fr → 1fr\` track can only collapse a child that clips its own overflow. Keep padding on \`.t-acc-panel-inner\`, never on \`.t-acc-panel\` — padding on the \`0fr\` track leaves a residual height strip so the panel never fully closes.
 
-### Why the chevron rotates instead of morphing its path
+### Why the chevron flips instead of morphing its path
 
-It's tempting to morph the chevron's SVG \`d\` between a "v" and a "^", but CSS \`d:\` path interpolation is **Chromium-only** — on mobile Safari and Firefox it snaps (or doesn't move at all). Rotating the whole chevron 180° is visually identical for a symmetric glyph and animates in every browser, so that's what the snippet ships.` },
+The natural way to turn the "v" into a "^" is to morph the chevron's SVG \`d\` between two vertex sets — but CSS \`d:\` path interpolation is **Chromium-only**, so on mobile Safari and Firefox it snaps (or doesn't move at all). A vertical flip (\`transform: scaleY(-1)\`) reproduces the same motion — it passes through a flat horizontal line at the midpoint, exactly like the path morph — and animates in every browser. Two requirements make it land cleanly: the chevron path must be **symmetric about the centre of its viewBox** (so the flip maps the "v" onto the "^"), and the path needs \`vector-effect: non-scaling-stroke\` so the stroke width stays constant while the box is squashed mid-flip.` },
 ];
 
 // ── Default-value rewrites ───────────────────────────────────────

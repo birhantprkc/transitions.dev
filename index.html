@@ -3527,22 +3527,27 @@
       text-align: left;
       -webkit-tap-highlight-color: transparent;
     }
-    /* Rotate the chevron 180° to flip the "v" into a "^". Rotation works
-       in every browser, unlike CSS `d:` path morphing, which only
-       animates in Chromium (so it never moved on mobile Safari). */
+    /* Flip the chevron vertically to turn the "v" into a "^". scaleY(-1)
+       about the centre passes through a flat line at the midpoint —
+       reproducing the original `d:` path morph — but, unlike CSS `d:`
+       morphing (Chromium only), it animates in every browser including
+       mobile Safari. The path is symmetric about the 16×16 viewBox
+       centre, so the flip lands exactly on the "^" shape; non-scaling
+       -stroke keeps the stroke width constant through the flip. */
     .p21-chevron {
       flex: 0 0 auto;
       display: inline-flex;
       width: 16px;
       height: 16px;
       color: var(--muted);
-      transform: rotate(0deg);
+      transform: scaleY(1);
       transform-origin: center;
       transition: transform var(--p21-chevron-dur) var(--p21-ease);
     }
     .p21-chevron svg { display: block; }
+    .p21-chevron path { vector-effect: non-scaling-stroke; }
     .p21-item[data-open="true"] .p21-chevron {
-      transform: rotate(180deg);
+      transform: scaleY(-1);
     }
     .p21-panel {
       display: grid;
@@ -7720,7 +7725,7 @@ export function Surface({ open, children }) {
             "\n" +
             "  Toggle `data-open` on the item. The panel animates via\n" +
             "  grid-template-rows 0fr ↔ 1fr (no JS height measuring) and\n" +
-            "  the chevron rotates 180° to flip the \"v\" into a \"^\".",
+            "  the chevron flips vertically (scaleY) from a \"v\" to a \"^\".",
           vars: [
             ["--acc-expand",   "--p21-expand-dur"],
             ["--acc-collapse", "--p21-collapse-dur"],
@@ -7754,17 +7759,22 @@ export function Surface({ open, children }) {
             "    opacity var(--acc-expand) var(--acc-ease),\n" +
             "    filter var(--acc-expand) var(--acc-ease);\n" +
             "}\n" +
-            "/* Rotate the chevron 180° to flip the \"v\" into a \"^\".\n" +
-            "   Rotation animates in every browser, unlike CSS `d:` path\n" +
-            "   morphing (Chromium only) — so it works on mobile Safari. */\n" +
+            "/* Flip the chevron vertically to turn the \"v\" into a \"^\".\n" +
+            "   scaleY(-1) about the centre passes through a flat line at\n" +
+            "   the midpoint (same look as a `d:` path morph) but animates\n" +
+            "   in every browser, unlike CSS `d:` morphing (Chromium only).\n" +
+            "   The chevron path is symmetric about the 16x16 viewBox\n" +
+            "   centre, so the flip lands exactly on the \"^\"; non-scaling\n" +
+            "   -stroke keeps the stroke width constant through the flip. */\n" +
             ".t-acc-chevron {\n" +
             "  display: inline-flex;\n" +
-            "  transform: rotate(0deg);\n" +
+            "  transform: scaleY(1);\n" +
             "  transform-origin: center;\n" +
             "  transition: transform var(--acc-chevron) var(--acc-ease);\n" +
             "}\n" +
+            ".t-acc-chevron path { vector-effect: non-scaling-stroke; }\n" +
             ".t-acc[data-open=\"true\"] .t-acc-chevron {\n" +
-            "  transform: rotate(180deg);\n" +
+            "  transform: scaleY(-1);\n" +
             "}\n" +
             "\n" +
             "@media (prefers-reduced-motion: reduce) {\n" +

@@ -4,7 +4,7 @@
 
 A disclosure / accordion / collapsible section whose panel grows and shrinks in height when toggled, with the header chevron flipping between a downward "v" and an upward "^". Use for settings groups, FAQs, filter sections, "show more" details — any header + collapsible body.
 
-Height animates via `grid-template-rows: 0fr ↔ 1fr`, so there's **no JS height measuring** and content of any size animates cleanly. The chevron rotates 180° to flip the "v" into a "^".
+Height animates via `grid-template-rows: 0fr ↔ 1fr`, so there's **no JS height measuring** and content of any size animates cleanly. The chevron flips vertically (`scaleY`) from a "v" to a "^", passing through a flat line at the midpoint.
 
 ## HTML usage
 
@@ -22,7 +22,7 @@ Height animates via `grid-template-rows: 0fr ↔ 1fr`, so there's **no JS height
 
 Toggle `data-open` on the item. The panel animates via
 grid-template-rows 0fr ↔ 1fr (no JS height measuring) and
-the chevron rotates 180° to flip the "v" into a "^".
+the chevron flips vertically (scaleY) from a "v" to a "^".
 
 ## Tunable variables
 
@@ -73,17 +73,22 @@ The `:root` defaults below match the live tuning on [transitions.dev](https://tr
     opacity var(--acc-expand) var(--acc-ease),
     filter var(--acc-expand) var(--acc-ease);
 }
-/* Rotate the chevron 180° to flip the "v" into a "^".
-   Rotation animates in every browser, unlike CSS `d:` path
-   morphing (Chromium only) — so it works on mobile Safari. */
+/* Flip the chevron vertically to turn the "v" into a "^".
+   scaleY(-1) about the centre passes through a flat line at
+   the midpoint (same look as a `d:` path morph) but animates
+   in every browser, unlike CSS `d:` morphing (Chromium only).
+   The chevron path is symmetric about the 16x16 viewBox
+   centre, so the flip lands exactly on the "^"; non-scaling
+   -stroke keeps the stroke width constant through the flip. */
 .t-acc-chevron {
   display: inline-flex;
-  transform: rotate(0deg);
+  transform: scaleY(1);
   transform-origin: center;
   transition: transform var(--acc-chevron) var(--acc-ease);
 }
+.t-acc-chevron path { vector-effect: non-scaling-stroke; }
 .t-acc[data-open="true"] .t-acc-chevron {
-  transform: rotate(180deg);
+  transform: scaleY(-1);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -113,7 +118,7 @@ head.addEventListener("click", () => {
 
 The panel needs the two-element structure (`.t-acc-panel` grid track + `.t-acc-panel-inner` with `overflow: hidden`). The `0fr → 1fr` track can only collapse a child that clips its own overflow. Keep padding on `.t-acc-panel-inner`, never on `.t-acc-panel` — padding on the `0fr` track leaves a residual height strip so the panel never fully closes.
 
-### Why the chevron rotates instead of morphing its path
+### Why the chevron flips instead of morphing its path
 
-It's tempting to morph the chevron's SVG `d` between a "v" and a "^", but CSS `d:` path interpolation is **Chromium-only** — on mobile Safari and Firefox it snaps (or doesn't move at all). Rotating the whole chevron 180° is visually identical for a symmetric glyph and animates in every browser, so that's what the snippet ships.
+The natural way to turn the "v" into a "^" is to morph the chevron's SVG `d` between two vertex sets — but CSS `d:` path interpolation is **Chromium-only**, so on mobile Safari and Firefox it snaps (or doesn't move at all). A vertical flip (`transform: scaleY(-1)`) reproduces the same motion — it passes through a flat horizontal line at the midpoint, exactly like the path morph — and animates in every browser. Two requirements make it land cleanly: the chevron path must be **symmetric about the centre of its viewBox** (so the flip maps the "v" onto the "^"), and the path needs `vector-effect: non-scaling-stroke` so the stroke width stays constant while the box is squashed mid-flip.
 
