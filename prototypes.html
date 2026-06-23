@@ -2630,25 +2630,22 @@
       text-align: left;
       -webkit-tap-highlight-color: transparent;
     }
+    /* Rotate the chevron 180° to flip the "v" into a "^". Rotation works
+       in every browser, unlike CSS `d:` path morphing, which only
+       animates in Chromium (so it never moved on mobile Safari). */
     .p21-chevron {
       flex: 0 0 auto;
       display: inline-flex;
       width: 16px;
       height: 16px;
       color: var(--muted);
+      transform: rotate(0deg);
+      transform-origin: center;
+      transition: transform var(--p21-chevron-dur) var(--p21-ease);
     }
     .p21-chevron svg { display: block; }
-    /* The chevron does NOT rotate — instead the path itself morphs from
-       a downward "v" to an upward "^" by animating the SVG `d` property.
-       Both paths share the same M/L/L command structure so the vertices
-       interpolate cleanly: the middle point travels top↔bottom while the
-       two ends move the opposite way. */
-    .p21-chevron path {
-      d: path("M4 6.5L8 10.5L12 6.5");
-      transition: d var(--p21-chevron-dur) var(--p21-ease);
-    }
-    .p21-item[data-open="true"] .p21-chevron path {
-      d: path("M4 9.5L8 5.5L12 9.5");
+    .p21-item[data-open="true"] .p21-chevron {
+      transform: rotate(180deg);
     }
     /* grid-template-rows 0fr → 1fr gives a clean height animation
        with no JS measurement. The inner element clips the content. */

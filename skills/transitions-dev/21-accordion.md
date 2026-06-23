@@ -2,9 +2,9 @@
 
 ## When to use
 
-A disclosure / accordion / collapsible section whose panel grows and shrinks in height when toggled, with the header chevron morphing between a downward "v" and an upward "^". Use for settings groups, FAQs, filter sections, "show more" details — any header + collapsible body.
+A disclosure / accordion / collapsible section whose panel grows and shrinks in height when toggled, with the header chevron flipping between a downward "v" and an upward "^". Use for settings groups, FAQs, filter sections, "show more" details — any header + collapsible body.
 
-Height animates via `grid-template-rows: 0fr ↔ 1fr`, so there's **no JS height measuring** and content of any size animates cleanly. The chevron's SVG `d` path morphs between two vertex sets rather than rotating, so it reads as a single fluid shape change.
+Height animates via `grid-template-rows: 0fr ↔ 1fr`, so there's **no JS height measuring** and content of any size animates cleanly. The chevron rotates 180° to flip the "v" into a "^".
 
 ## HTML usage
 
@@ -22,7 +22,7 @@ Height animates via `grid-template-rows: 0fr ↔ 1fr`, so there's **no JS height
 
 Toggle `data-open` on the item. The panel animates via
 grid-template-rows 0fr ↔ 1fr (no JS height measuring) and
-the chevron's `d` path morphs from a "v" to a "^".
+the chevron rotates 180° to flip the "v" into a "^".
 
 ## Tunable variables
 
@@ -73,18 +73,21 @@ The `:root` defaults below match the live tuning on [transitions.dev](https://tr
     opacity var(--acc-expand) var(--acc-ease),
     filter var(--acc-expand) var(--acc-ease);
 }
-/* The chevron does NOT rotate — its path morphs. Both `d`
-   values share the same M/L/L structure so vertices tween. */
-.t-acc-chevron path {
-  d: path("M4 6.5L8 10.5L12 6.5");
-  transition: d var(--acc-chevron) var(--acc-ease);
+/* Rotate the chevron 180° to flip the "v" into a "^".
+   Rotation animates in every browser, unlike CSS `d:` path
+   morphing (Chromium only) — so it works on mobile Safari. */
+.t-acc-chevron {
+  display: inline-flex;
+  transform: rotate(0deg);
+  transform-origin: center;
+  transition: transform var(--acc-chevron) var(--acc-ease);
 }
-.t-acc[data-open="true"] .t-acc-chevron path {
-  d: path("M4 9.5L8 5.5L12 9.5");
+.t-acc[data-open="true"] .t-acc-chevron {
+  transform: rotate(180deg);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .t-acc-panel, .t-acc-panel-inner, .t-acc-chevron path {
+  .t-acc-panel, .t-acc-panel-inner, .t-acc-chevron {
     transition: none !important;
   }
 }
@@ -110,7 +113,7 @@ head.addEventListener("click", () => {
 
 The panel needs the two-element structure (`.t-acc-panel` grid track + `.t-acc-panel-inner` with `overflow: hidden`). The `0fr → 1fr` track can only collapse a child that clips its own overflow. Keep padding on `.t-acc-panel-inner`, never on `.t-acc-panel` — padding on the `0fr` track leaves a residual height strip so the panel never fully closes.
 
-### The `d:` path morph is Chromium-only
+### Why the chevron rotates instead of morphing its path
 
-CSS `d:` path interpolation animates in Chromium; in Firefox / Safari the chevron snaps between the two paths (everything else still animates). Both `d` values must share identical command structure (same count and order of `M` / `L`) to interpolate. If you need cross-browser chevron motion, swap the path morph for a `transform: rotate(180deg)` on the chevron instead.
+It's tempting to morph the chevron's SVG `d` between a "v" and a "^", but CSS `d:` path interpolation is **Chromium-only** — on mobile Safari and Firefox it snaps (or doesn't move at all). Rotating the whole chevron 180° is visually identical for a symmetric glyph and animates in every browser, so that's what the snippet ships.
 

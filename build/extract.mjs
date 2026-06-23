@@ -271,15 +271,15 @@ The plus button must overlay the panel, pinned to a corner (\`inset: auto 0 0 au
 ### Open and close use different eases
 
 The bouncy \`--morph-ease\` only drives the open; the close falls back to the calm \`--morph-close-ease\`. Don't collapse them into one variable. Adjust the open \`width\` / \`height\` in the snippet to your real panel size — they're hardcoded, not derived from the content.` },
-  { key: "p21", file: "21-accordion", summary: "Grow / shrink a panel via grid-rows with a chevron path morph",
-    when: "A disclosure / accordion / collapsible section whose panel grows and shrinks in height when toggled, with the header chevron morphing between a downward \"v\" and an upward \"^\". Use for settings groups, FAQs, filter sections, \"show more\" details — any header + collapsible body.\n\nHeight animates via `grid-template-rows: 0fr ↔ 1fr`, so there's **no JS height measuring** and content of any size animates cleanly. The chevron's SVG `d` path morphs between two vertex sets rather than rotating, so it reads as a single fluid shape change.",
+  { key: "p21", file: "21-accordion", summary: "Grow / shrink a panel via grid-rows with a chevron flip",
+    when: "A disclosure / accordion / collapsible section whose panel grows and shrinks in height when toggled, with the header chevron flipping between a downward \"v\" and an upward \"^\". Use for settings groups, FAQs, filter sections, \"show more\" details — any header + collapsible body.\n\nHeight animates via `grid-template-rows: 0fr ↔ 1fr`, so there's **no JS height measuring** and content of any size animates cleanly. The chevron rotates 180° to flip the \"v\" into a \"^\".",
     notes: `### Two-element panel + padding placement
 
 The panel needs the two-element structure (\`.t-acc-panel\` grid track + \`.t-acc-panel-inner\` with \`overflow: hidden\`). The \`0fr → 1fr\` track can only collapse a child that clips its own overflow. Keep padding on \`.t-acc-panel-inner\`, never on \`.t-acc-panel\` — padding on the \`0fr\` track leaves a residual height strip so the panel never fully closes.
 
-### The \`d:\` path morph is Chromium-only
+### Why the chevron rotates instead of morphing its path
 
-CSS \`d:\` path interpolation animates in Chromium; in Firefox / Safari the chevron snaps between the two paths (everything else still animates). Both \`d\` values must share identical command structure (same count and order of \`M\` / \`L\`) to interpolate. If you need cross-browser chevron motion, swap the path morph for a \`transform: rotate(180deg)\` on the chevron instead.` },
+It's tempting to morph the chevron's SVG \`d\` between a "v" and a "^", but CSS \`d:\` path interpolation is **Chromium-only** — on mobile Safari and Firefox it snaps (or doesn't move at all). Rotating the whole chevron 180° is visually identical for a symmetric glyph and animates in every browser, so that's what the snippet ships.` },
 ];
 
 // ── Default-value rewrites ───────────────────────────────────────

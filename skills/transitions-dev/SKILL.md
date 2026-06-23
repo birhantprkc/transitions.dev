@@ -31,7 +31,7 @@ Twenty-one portable CSS transitions, each namespaced under `t-*` selectors with 
 | **Texts reveal** | Staggered blurred rise for stacked text lines, quiet fade out. | [18-texts-reveal.md](./18-texts-reveal.md) |
 | **Card hover tilt** | Tilt a card in 3D toward the pointer with a cursor-tracked glare. | [19-card-tilt.md](./19-card-tilt.md) |
 | **Plus to menu morph** | Morph a circular trigger into the menu / panel it opens. | [20-plus-menu-morph.md](./20-plus-menu-morph.md) |
-| **Accordion expand** | Grow / shrink a panel via grid-rows with a chevron path morph. | [21-accordion.md](./21-accordion.md) |
+| **Accordion expand** | Grow / shrink a panel via grid-rows with a chevron flip. | [21-accordion.md](./21-accordion.md) |
 
 ## Decision rules
 
@@ -195,7 +195,7 @@ Keep the diff small: only edit the files needed to introduce the transition. Don
 - **Forgetting to write the tabs pill's first position without a transition** — on first paint and resize, set `transform` + `width` with `transition: none` (then reflow + restore) or the pill animates in from `translateX(0)` / `width: 0`.
 - **Tracking the pointer on the tilting element itself** for card hover tilt — bind `pointermove` to the flat outer `.t-tilt` wrapper, not `.t-tilt-card`, or the rotating edges slip under the cursor and the hover flickers.
 - **Padding on the accordion grid track** — put padding on `.t-acc-panel-inner`, never on `.t-acc-panel`; padding on the `0fr` track leaves a residual height strip so the panel never fully closes.
-- **Expecting the accordion chevron `d` morph to animate everywhere** — CSS `d:` path interpolation is Chromium-only; in Firefox / Safari it snaps. Fall back to a `rotate(180deg)` chevron if cross-browser motion matters.
+- **Morphing the accordion chevron's `d` path** — CSS `d:` path interpolation is Chromium-only, so it never animates on mobile Safari / Firefox. Rotate the whole chevron `180deg` instead (visually identical for a symmetric glyph, works everywhere) — which is what the snippet ships.
 
 ## Reference files
 

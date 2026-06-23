@@ -3527,24 +3527,22 @@
       text-align: left;
       -webkit-tap-highlight-color: transparent;
     }
+    /* Rotate the chevron 180° to flip the "v" into a "^". Rotation works
+       in every browser, unlike CSS `d:` path morphing, which only
+       animates in Chromium (so it never moved on mobile Safari). */
     .p21-chevron {
       flex: 0 0 auto;
       display: inline-flex;
       width: 16px;
       height: 16px;
       color: var(--muted);
+      transform: rotate(0deg);
+      transform-origin: center;
+      transition: transform var(--p21-chevron-dur) var(--p21-ease);
     }
     .p21-chevron svg { display: block; }
-    /* The chevron does NOT rotate — the path itself morphs from a
-       downward "v" to an upward "^" by animating the SVG `d`. Both
-       paths share the same M/L/L command structure so the vertices
-       interpolate cleanly. */
-    .p21-chevron path {
-      d: path("M4 6.5L8 10.5L12 6.5");
-      transition: d var(--p21-chevron-dur) var(--p21-ease);
-    }
-    .p21-item[data-open="true"] .p21-chevron path {
-      d: path("M4 9.5L8 5.5L12 9.5");
+    .p21-item[data-open="true"] .p21-chevron {
+      transform: rotate(180deg);
     }
     .p21-panel {
       display: grid;
@@ -7722,7 +7720,7 @@ export function Surface({ open, children }) {
             "\n" +
             "  Toggle `data-open` on the item. The panel animates via\n" +
             "  grid-template-rows 0fr ↔ 1fr (no JS height measuring) and\n" +
-            "  the chevron's `d` path morphs from a \"v\" to a \"^\".",
+            "  the chevron rotates 180° to flip the \"v\" into a \"^\".",
           vars: [
             ["--acc-expand",   "--p21-expand-dur"],
             ["--acc-collapse", "--p21-collapse-dur"],
@@ -7756,18 +7754,21 @@ export function Surface({ open, children }) {
             "    opacity var(--acc-expand) var(--acc-ease),\n" +
             "    filter var(--acc-expand) var(--acc-ease);\n" +
             "}\n" +
-            "/* The chevron does NOT rotate — its path morphs. Both `d`\n" +
-            "   values share the same M/L/L structure so vertices tween. */\n" +
-            ".t-acc-chevron path {\n" +
-            "  d: path(\"M4 6.5L8 10.5L12 6.5\");\n" +
-            "  transition: d var(--acc-chevron) var(--acc-ease);\n" +
+            "/* Rotate the chevron 180° to flip the \"v\" into a \"^\".\n" +
+            "   Rotation animates in every browser, unlike CSS `d:` path\n" +
+            "   morphing (Chromium only) — so it works on mobile Safari. */\n" +
+            ".t-acc-chevron {\n" +
+            "  display: inline-flex;\n" +
+            "  transform: rotate(0deg);\n" +
+            "  transform-origin: center;\n" +
+            "  transition: transform var(--acc-chevron) var(--acc-ease);\n" +
             "}\n" +
-            ".t-acc[data-open=\"true\"] .t-acc-chevron path {\n" +
-            "  d: path(\"M4 9.5L8 5.5L12 9.5\");\n" +
+            ".t-acc[data-open=\"true\"] .t-acc-chevron {\n" +
+            "  transform: rotate(180deg);\n" +
             "}\n" +
             "\n" +
             "@media (prefers-reduced-motion: reduce) {\n" +
-            "  .t-acc-panel, .t-acc-panel-inner, .t-acc-chevron path {\n" +
+            "  .t-acc-panel, .t-acc-panel-inner, .t-acc-chevron {\n" +
             "    transition: none !important;\n" +
             "  }\n" +
             "}"
