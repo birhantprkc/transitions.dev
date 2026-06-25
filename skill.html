@@ -3086,7 +3086,7 @@
        in a copyable code row plus a one-line description underneath.
        The wrapper keeps the verb and its blurb visually paired so the
        reader can scan the bold command first and then the rationale,
-       while the section's outer gap is widened so the three commands
+       while the section's outer gap is widened so the commands
        don't look like a tight rhythm of similar rows. */
     #commands .skill-section-rows { gap: 16px; }
     .skill-command {
@@ -3517,7 +3517,7 @@
               </button>
             </div>
             <p class="skill-section-note">
-              Scan the whole project for ad-hoc transitions, hardcoded durations, and custom keyframes, then output a per-file list of where one of the twelve transitions would slot in. Read-only — nothing gets edited. Also triggers on "review my project" or "audit my animations".
+              Scan the whole project for ad-hoc transitions, hardcoded durations, and custom keyframes, then output a per-file list of where one of the twenty-one transitions would slot in. Read-only — nothing gets edited. Also triggers on "review my project" or "audit my animations".
             </p>
           </div>
           <div class="skill-command">
@@ -3540,6 +3540,28 @@
             </div>
             <p class="skill-section-note">
               Auto-detect the best-fit transition for your current cursor context, propose it with a one-line rationale, then install it after you confirm. Name a transition directly to skip the detection — for example, <code>transitions apply menu-dropdown</code>. Also triggers on "add the right transition here".
+            </p>
+          </div>
+          <div class="skill-command">
+            <div class="skill-code-row">
+              <code id="cmd-refine">transitions refine</code>
+              <button
+                type="button"
+                class="card-copy"
+                aria-label="Copy transitions refine command"
+                data-copy-target="#cmd-refine"
+              >
+                <svg class="icon-copy" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+                <svg class="icon-check" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </button>
+            </div>
+            <p class="skill-section-note">
+              Scan the whole project for ad-hoc transitions, hardcoded durations, and custom keyframes, then suggest the matching motion token to reference — using each token's <em>usage</em>, not the raw number, as the deciding factor. Read-only — nothing gets edited. Also triggers on "replace hardcoded durations with motion tokens" or "tokenize my animations".
             </p>
           </div>
         </div>
