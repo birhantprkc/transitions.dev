@@ -78,10 +78,11 @@ export function refineTimings(timings) {
           id: `${prop}-duration`,
           kind: "duration",
           property: prop,
+          member: t.member || null,
           title: `Duration → ${token.name}`,
           from: `${t.durationMs}ms`,
           to: `${token.ms}ms`,
-          patch: { property: prop, durationMs: token.ms },
+          patch: { property: prop, durationMs: token.ms, ...(t.member ? { member: t.member } : {}) },
           reason: `${token.name} (${token.ms}ms) is the closest motion token — used for ${token.usage}. ${t.durationMs}ms is off-grid.`,
         });
       }
@@ -93,10 +94,11 @@ export function refineTimings(timings) {
         id: `${prop}-easing`,
         kind: "easing",
         property: prop,
+        member: t.member || null,
         title: `Easing → Smooth ease out`,
         from: t.easing,
         to: SMOOTH_OUT,
-        patch: { property: prop, easing: SMOOTH_OUT },
+        patch: { property: prop, easing: SMOOTH_OUT, ...(t.member ? { member: t.member } : {}) },
         reason: `"${t.easing}" is a generic curve. The transitions.dev standard ease-out reads more intentional on opens, closes, slides, and resizes.`,
       });
     }

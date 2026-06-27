@@ -6,7 +6,7 @@
   <title>Timeline Inspector — Demo</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     /* @inject-skip-start (demo-only global resets — excluded from the injected build) */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -76,7 +76,7 @@
       --text-swap-ease: ease-in-out;
       --shimmer-ease: linear;
       /* transitions.dev — panel reveal (per-phase distance/ease/scale) */
-      --panel-open-dur: 400ms; --panel-close-dur: 250ms;
+      --panel-open-dur: 400ms; --panel-close-dur: 350ms;
       /* refine panel close runs a touch longer than the main panel close */
       --refine-close-dur: 350ms;
       --panel-open-distance: 100px; --panel-close-distance: 10px;
@@ -213,12 +213,32 @@
       width: 40px; height: 3px; border-radius: 2px; background: #dcdce2; pointer-events: none;
       transition: background 0.15s;
     }
-    .tl-resize-handle:hover::after, .tl-resize-handle.dragging::after { background: var(--c-blue); }
+    .tl-resize-handle:hover::after, .tl-resize-handle.dragging::after { background: var(--c-thumb); }
     .tl-panel-body { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: row; gap: 0; pointer-events: auto;
-      background: #fff; border-radius: 12px; box-shadow: var(--card-shadow); overflow: hidden; }
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 2px 6px 0 rgba(0, 0, 0, 0.05), 0 4px 42px 0 rgba(0, 0, 0, 0.06);
+      overflow: hidden; }
     .tl-panel-body > * { pointer-events: auto; }
     /* timeline content column — full width; the refine panel overlays it without reflow */
     .tl-panel-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 0; overflow: hidden; }
+    /* transient toast (Copy values → "Values copied"). enter 250ms Fast,
+       exit 350ms Medium (toast-close token), Smooth ease out both ways. */
+    .tl-toast-wrap { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+      z-index: 2147483600; pointer-events: none; }
+    .tl-toast { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px 0 10px;
+      border-radius: 60px; background: #fff; color: var(--c-text-strong);
+      font: inherit; font-size: 13px; font-weight: 400; line-height: 14px; white-space: nowrap;
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.08), 0 2px 6px 0 rgba(0,0,0,0.05), 0 4px 42px 0 rgba(0,0,0,0.06);
+      animation: tl-toast-in 250ms cubic-bezier(0.22,1,0.36,1) both; }
+    .tl-toast.is-closing { animation: tl-toast-out 350ms cubic-bezier(0.22,1,0.36,1) both; }
+    /* gray icon to match the Accept button's icon (#17181C) */
+    .tl-toast-ic { display: flex; flex: none; color: #17181C; }
+    @keyframes tl-toast-in { from { opacity: 0; transform: translateY(8px) scale(0.98); }
+      to { opacity: 1; transform: none; } }
+    @keyframes tl-toast-out { from { opacity: 1; transform: none; }
+      to { opacity: 0; transform: translateY(8px) scale(0.98); } }
+    @media (prefers-reduced-motion: reduce) {
+      .tl-toast, .tl-toast.is-closing { animation: none; } }
     .tl-pill { position: fixed; bottom: 16px; right: 16px; z-index: 99999;
       height: 40px; background: #fff; border-radius: 36px;
       padding: 6px 10px 6px 16px;
@@ -242,7 +262,7 @@
     .tl-header { flex: none; position: relative; z-index: 40; display: flex; align-items: center; gap: 8px; padding: 7.5px 14px;
       border-bottom: 1px solid var(--c-line); }
     .tl-header-label { font-size: 13px; font-weight: 500; line-height: 18px; color: var(--c-text-mut2); white-space: nowrap; }
-    .tl-header-count { margin-left: auto; font-size: 13px; line-height: 18px; color: var(--c-count); white-space: nowrap; }
+    .tl-header-count { margin-left: auto; display: inline-flex; align-items: center; font-size: 13px; line-height: 18px; color: var(--c-count); white-space: nowrap; }
 
     /* ── buttons ── */
     /* topbar buttons share a fully rounded 60px corner radius */
@@ -306,7 +326,6 @@
       display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px;
       border: none; border-radius: 8px; background: transparent; color: var(--c-blue);
       box-shadow: var(--drop-btn);
-      box-shadow: 0 1px 3px 0 color(display-p3 0.0157 0.1608 0.4588 / 0.08);
       font: inherit; font-size: 13px; font-weight: 500; line-height: 14px;
       cursor: pointer; white-space: nowrap; transition: color 0.12s ease; }
     .tl-refine-btn::before { content: ""; position: absolute; inset: 0; border-radius: inherit;
@@ -315,7 +334,6 @@
       transition: background 0.12s ease; z-index: 0; }
     .tl-refine-btn::after { content: ""; position: absolute; inset: 0; border-radius: inherit;
       box-shadow: var(--ring-blue);
-      box-shadow: inset 0 0 0 1px color(display-p3 0 0.3961 0.8157 / 0.10), inset 0 -1px 0 0 color(display-p3 0.0118 0.2588 0.5569 / 0.15);
       pointer-events: none; z-index: 2; }
     .tl-refine-btn > * { position: relative; z-index: 1; }
     /* Figma: wand icon stroke is #0073E5, distinct from the #0071e2 label */
@@ -326,9 +344,9 @@
     .tl-refine-btn:disabled { cursor: default; color: var(--c-blue); }
     .tl-refine-btn:disabled::before { background: var(--c-blue-bg); background: color(display-p3 0 0.451 0.898 / 0.06); }
     .tl-refine-btn:disabled span { color: var(--c-blue-pressed); opacity: 0.5; }
-    /* tiny 1px sparks flying out along each of the wand's spark rays on hover */
+    /* tiny 1.5px sparks flying out along each of the wand's spark rays on hover */
     .tl-refine-sparks { position: absolute; left: 23px; top: 15px; width: 0; height: 0; z-index: 3; pointer-events: none; }
-    .tl-refine-sparks i { position: absolute; left: 0; top: 0; width: 1px; height: 1px; border-radius: 50%;
+    .tl-refine-sparks i { position: absolute; left: 0; top: 0; width: 1.5px; height: 1.5px; border-radius: 50%;
       background: var(--c-blue); opacity: 0; }
     @keyframes tl-refine-spark {
       0%   { opacity: 0; transform: translate(var(--ox, 0), var(--oy, 0)) scale(0.4); }
@@ -344,9 +362,14 @@
     /* ── body / floating cards row ── */
     .tl-body { display: flex; flex: 1; min-height: 0; gap: 0; }
     .tl-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-    .tl-inspector { flex: 0 0 280px; padding: 14px 16px 18px; display: flex; flex-direction: column;
+    .tl-inspector { flex: 0 0 280px; padding: 16px 16px; display: flex; flex-direction: column;
       border-left: 1px solid var(--c-line); min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-    .tl-insp-title { font-size: 13px; font-weight: 500; line-height: 18px; color: #171717; margin-bottom: 10px; text-transform: capitalize; }
+    /* title sits centered in the ~52px band between the Refine toolbar and the
+       Duration field: 16px above + 20px title + 16px below = 52px */
+    .tl-insp-title { display: flex; align-items: center; font-size: 13px; font-weight: 500; line-height: 18px; color: #171717; margin-bottom: 16px; text-transform: capitalize; }
+    /* full-bleed divider between the Delay field and the Easing/Springs tabs
+       (Figma 580:9049 — spans the inspector edge-to-edge past the 16px padding) */
+    .tl-inspector-divider { height: 1px; background: var(--c-line); margin: 0 -16px; }
     .tl-insp-label { font-size: 12px; line-height: 18px; color: #737373; margin: 10px 0 6px; }
 
     /* ── tracks / ruler ── */
@@ -411,11 +434,11 @@
     .tl-col-resizer-line { width: 1px; height: 100%; background: transparent;
       transition: background 0.12s ease, width 0.12s ease; }
     .tl-col-resizer:hover .tl-col-resizer-line,
-    .tl-col-resizer.dragging .tl-col-resizer-line { width: 2px; background: #1A7AFF; }
+    .tl-col-resizer.dragging .tl-col-resizer-line { width: 2px; background: var(--c-thumb); }
     @media (prefers-reduced-motion: reduce) { .tl-col-resizer-line { transition: none; } }
 
     /* ── value field (slider + input) — exact Figma "Value slider and input" ── */
-    .tl-field-wrap { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+    .tl-field-wrap { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
     .tl-field { position: relative; flex: 1; min-width: 0; height: 32px; border-radius: 8px;
       background: var(--c-field-bg); transition: box-shadow 0.12s ease; }
     /* focused: dual inset ring (Figma Focused state) */
@@ -452,7 +475,7 @@
     .tl-field-chevron:active { scale: 0.96; }
 
     /* ── easing editor ── */
-    .tl-ease { display: flex; flex-direction: column; gap: 8px; }
+    .tl-ease { display: flex; flex-direction: column; gap: 12px; }
 
     /* tab content page-slide (transitions.dev · 08-page-side-by-side) */
     .tl-ease-pages.t-page-slide {
@@ -472,6 +495,7 @@
     .tl-ease-pages .t-page[data-page-id="2"] { --t-page-from-x: var(--page-slide-distance); }
     .tl-ease-pages .t-page {
       position: absolute; top: 0; left: 0; right: 0;
+      display: flex; flex-direction: column; gap: 12px;
       opacity: 0; pointer-events: none;
       transform: translateX(calc(var(--t-page-from-x, 0px) * var(--page-exit-enabled)));
       filter: blur(calc(var(--page-blur) * var(--page-exit-enabled)));
@@ -501,48 +525,37 @@
     .tl-select:disabled { opacity: 0.5; cursor: default; }
     .tl-select-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .tl-select-chev { display: flex; color: var(--c-ruler); flex: none; }
-    /* easing curve — exact Figma (node 13044:2506): #f6f6f7, ~6px radius, subtle inset border */
-    .tl-curve { background: #f6f6f7; border-radius: 6px; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.04);
+    /* easing curve — exact Figma (node 580:11158): #f6f6f7, 8px radius, no grid */
+    .tl-curve { background: #f6f6f7; border-radius: 8px;
       padding: 0; position: relative; overflow: hidden; }
     .tl-curve svg { display: block; cursor: crosshair; width: 100%; height: auto; }
     .tl-curve-handle { cursor: grab; }
     .tl-curve-handle:active { cursor: grabbing; }
     .tl-cubic-row { display: flex; gap: 4px; }
-    /* number field — Logram design system (node 13064:2431): 32px, #f7f7f7 fill,
-       Inter Medium 13/16, gray hover overlay, inset 1px focus ring */
-    .tl-cubic-row input { flex: 1; width: 0; height: 32px; border: none; border-radius: 8px; background: #f7f7f7;
-      box-sizing: border-box; padding: 8px 0;
-      text-align: center; font: inherit; font-size: 13px; font-weight: 500; line-height: 16px; color: #1b1b1b;
-      outline: none; box-shadow: inset 0 0 0 0 rgba(0,0,0,0.14); transition: box-shadow 0.12s ease, background 0.12s ease; }
+    /* number field — Figma node 580:4814: value left-aligned (#1b1b1b),
+       32px #f7f7f7 pill, hover overlay + inset focus ring. */
+    .tl-cubic-cell { flex: 1; min-width: 0; display: flex; flex-direction: row; align-items: center;
+      gap: 4px; height: 32px; box-sizing: border-box;
+      padding: 0 8px; border-radius: 8px; background: #f7f7f7;
+      box-shadow: inset 0 0 0 0 rgba(0,0,0,0.14); transition: box-shadow 0.12s ease, background 0.12s ease; }
+    .tl-cubic-cell:hover { background: linear-gradient(rgba(170,170,170,0.2),rgba(170,170,170,0.2)), #f7f7f7; }
+    .tl-cubic-cell:focus-within { box-shadow: inset 0 0 0 1px rgba(0,0,0,0.14); }
+    .tl-cubic-row input { flex: 1; min-width: 0; width: 100%; height: 100%; border: none; background: transparent;
+      box-sizing: border-box; padding: 0; text-align: left;
+      font: inherit; font-size: 12px; font-weight: 500; line-height: 16px; color: #1b1b1b; outline: none;
+      -moz-appearance: textfield; appearance: textfield; }
+    .tl-cubic-row input::-webkit-outer-spin-button, .tl-cubic-row input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; width: 0; }
     .tl-cubic-row input::placeholder { color: #979797; }
-    .tl-cubic-row input:hover { background: linear-gradient(rgba(170,170,170,0.2),rgba(170,170,170,0.2)), #f7f7f7; }
-    .tl-cubic-row input:focus { box-shadow: inset 0 0 0 1px rgba(0,0,0,0.14); }
     .tl-custom-input { height: 30px; border: none; border-radius: 6px; background: var(--c-field-bg); padding: 0 8px;
       font: inherit; font-size: 12px; font-family: monospace; color: var(--c-text); outline: none;
       box-shadow: inset 0 0 0 1px rgba(0,0,0,0.04); }
-    .tl-bounce { background: #fff; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--c-hairline);
-      padding: 12px; display: flex; flex-direction: column; gap: 11px; }
-    .tl-bounce-title { font-size: 11px; color: var(--c-text-mut); font-weight: 600; letter-spacing: 0.01em; }
-    .tl-bounce-row { display: flex; align-items: center; gap: 10px; }
-    .tl-bounce-row label { font-size: 12px; color: #585858; font-weight: 500; width: 58px; flex: none; }
-    .tl-bounce-row input[type="range"] { flex: 1; height: 5px; -webkit-appearance: none; appearance: none;
-      background: #e7e7ec; border-radius: 3px; outline: none; cursor: pointer; transition: filter 0.12s ease; }
-    .tl-bounce-row input[type="range"]:hover { filter: brightness(0.98); }
-    .tl-bounce-row input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none;
-      width: 14px; height: 14px; border-radius: 50%; background: var(--c-blue); cursor: pointer;
-      border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,113,226,0.4), 0 0 0 0.5px rgba(0,0,0,0.04);
-      transition: transform 0.12s cubic-bezier(0.22,1,0.36,1); }
-    .tl-bounce-row input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.12); }
-    .tl-bounce-row input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.18); }
-    .tl-bounce-row input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%;
-      background: var(--c-blue); cursor: pointer; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,113,226,0.4); }
-    .tl-bounce-val { font-size: 12px; font-weight: 600; color: var(--c-blue); width: 38px; text-align: right;
-      font-variant-numeric: tabular-nums; }
-    .tl-bounce select { height: 26px; border: none; border-radius: 6px; background: var(--c-field-bg);
-      font: inherit; font-size: 11px; color: var(--c-text); outline: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.04); flex: 1; }
+    /* Spring physics controls — exact Figma "Value slider and input" scrubbers
+       (same .tl-field component as Duration/Delay; no chevron stepper). */
+    .tl-spring-fields { display: flex; flex-direction: column; gap: 10px; }
+    .tl-spring-field { margin-bottom: 0; }
 
     /* ── Easing / Springs tabs — Logram design system (node 13064:2552): trackless toggle pills ── */
-    .tl-seg { display: flex; align-items: center; gap: 4px; margin-top: 10px; }
+    .tl-seg { display: flex; align-items: center; gap: 4px; margin-top: 0; }
     .tl-seg-btn { height: 32px; padding: 6px 12px; border: none; border-radius: 8px; background: transparent;
       font: inherit; font-size: 13px; font-weight: 500; line-height: 14px; color: #676767; cursor: pointer;
       transition: background 0.14s ease, color 0.14s ease; }
@@ -551,40 +564,42 @@
 
     /* position preview (animated marker à la easing.dev) — collapsible accordion
        (transitions.dev · 21-accordion: grid-rows 0fr↔1fr + vertical chevron flip) */
-    .tl-preview { margin-top: 10px; background: #fff; border-radius: 10px;
-      box-shadow: inset 0 0 0 1px var(--c-hairline); overflow: hidden;
+    .tl-preview { margin-top: 0; background: transparent;
       --acc-dur: 260ms; --acc-ease: cubic-bezier(0.22, 1, 0.36, 1); }
-    .tl-preview-head { display: flex; align-items: center; justify-content: space-between; width: 100%;
-      padding: 9px 12px; border: none; background: transparent; cursor: pointer; font: inherit;
-      border-radius: 10px; transition: background 0.12s ease; }
-    .tl-preview-head:hover { background: rgba(170,170,170,0.06); }
-    .tl-preview-title { font-size: 11px; font-weight: 600; color: var(--c-text-mut); letter-spacing: 0.01em; }
-    .tl-preview-chevron { display: inline-flex; color: var(--c-ruler);
+    .tl-preview-head { display: flex; align-items: center; justify-content: flex-start; gap: 6px; width: 100%;
+      padding: 0 0 9px; border: none; background: transparent; cursor: pointer; font: inherit;
+      transition: color 0.12s ease; }
+    .tl-preview-head:hover .tl-preview-title,
+    .tl-preview-head:hover .tl-preview-chevron { color: #000; }
+    .tl-preview-title { font-size: 13px; font-weight: 500; color: #171717; letter-spacing: 0; line-height: 18px; }
+    .tl-preview-chevron { display: inline-flex; color: #171717;
       transform: scaleY(1); transform-origin: center; transition: transform var(--acc-dur) var(--acc-ease); }
     .tl-preview[data-open="true"] .tl-preview-chevron { transform: scaleY(-1); }
     .tl-preview-panel { display: grid; grid-template-rows: 0fr;
       transition: grid-template-rows var(--acc-dur) var(--acc-ease); }
     .tl-preview[data-open="true"] .tl-preview-panel { grid-template-rows: 1fr; }
-    .tl-preview-panel-inner { overflow: hidden; opacity: 0; filter: blur(2px); padding: 0 12px 12px;
+    .tl-preview-panel-inner { overflow: hidden; opacity: 0; filter: blur(2px);
       transition: opacity var(--acc-dur) var(--acc-ease), filter var(--acc-dur) var(--acc-ease); }
     .tl-preview[data-open="true"] .tl-preview-panel-inner { opacity: 1; filter: blur(0); }
-    .tl-preview-controls { display: flex; justify-content: flex-end; margin-bottom: 10px; }
-    .tl-preview-btn { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px 0 7px;
-      border: none; border-radius: 6px; background: var(--c-field-bg); color: var(--c-text-mut2);
-      font: inherit; font-size: 11px; font-weight: 500; cursor: pointer;
-      transition: background 0.12s ease, scale 0.12s ease; }
-    .tl-preview-btn:hover { background: var(--c-sec-h); }
-    .tl-preview-btn:active { scale: 0.96; }
-    .tl-preview-track { position: relative; height: 22px; }
-    .tl-preview-rail { position: absolute; left: 0; right: 0; top: 50%; height: 2px; transform: translateY(-50%);
-      background: var(--c-track); border-radius: 2px; }
-    .tl-preview-end { position: absolute; top: 50%; width: 2px; height: 10px; transform: translateY(-50%);
-      background: #d0d0d6; border-radius: 2px; }
-    .tl-preview-end.left { left: 0; }
-    .tl-preview-end.right { right: 0; }
-    .tl-preview-dot { position: absolute; left: 0; top: 50%; width: 18px; height: 18px; margin-top: -9px;
-      border-radius: 50%; background: var(--c-blue); border: 2px solid #fff;
-      box-shadow: 0 2px 6px rgba(0,113,226,0.4), 0 0 0 0.5px rgba(0,0,0,0.05);
+    .tl-preview-body { padding: 0; }
+    .tl-preview-curve { margin-bottom: 12px; min-height: 162px; display: flex; align-items: center; }
+    .tl-preview-sub { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .tl-preview-sub-label { font-size: 13px; font-weight: 500; color: #171717; line-height: 18px; }
+    .tl-preview-play { border: none; background: transparent; padding: 0; font: inherit; font-size: 13px;
+      font-weight: 500; color: var(--c-text-mut); cursor: pointer; line-height: 18px;
+      transition: color 0.12s ease; }
+    .tl-preview-play:hover { color: #171717; }
+    .tl-preview-play:active { color: var(--c-blue); }
+    /* position-preview track — Figma 580:9117: dot + dashed rail inside a
+       #f6f6f7 rounded card (58px tall, 21px horizontal inset for the dot) */
+    .tl-preview-track { height: 58px; background: #f6f6f7; border-radius: 8px;
+      display: flex; align-items: center; padding: 0 21px; }
+    .tl-preview-rail-wrap { position: relative; flex: 1; height: 28px; }
+    .tl-preview-rail { position: absolute; left: 14px; right: 0; top: 50%; height: 0; transform: translateY(-50%);
+      border-top: 1.5px dashed #d4d4d8; }
+    .tl-preview-dot { position: absolute; left: 0; top: 50%; width: 28px; height: 28px; margin-top: -14px;
+      border-radius: 50%; background: var(--c-blue);
+      box-shadow: 0 2px 8px rgba(0,113,226,0.28), 0 0 0 0.5px rgba(0,0,0,0.04);
       will-change: transform; }
     @media (prefers-reduced-motion: reduce) {
       .tl-preview-panel, .tl-preview-panel-inner, .tl-preview-chevron { transition: none !important; }
@@ -595,10 +610,10 @@
       color: #8b8b8b; pointer-events: none; }
     .tl-menu-group:first-child { padding-top: 4px; }
 
-    /* spring params box (reuses bounce row layout) */
-    .tl-spring-dur { display: flex; align-items: baseline; gap: 6px; font-size: 12px; color: var(--c-text-mut);
-      padding-top: 10px; border-top: 1px solid var(--c-hairline); margin-top: 0; }
-    .tl-spring-dur b { color: var(--c-text); font-weight: 600; font-variant-numeric: tabular-nums; }
+    /* derived-duration caption under the spring fields (Figma 580:9116 — muted) */
+    .tl-spring-dur { font-size: 12px; line-height: 16px; color: var(--c-text-faint);
+      font-variant-numeric: tabular-nums; }
+    .tl-spring-dur b { color: var(--c-text-mut); font-weight: 500; font-variant-numeric: tabular-nums; }
     .tl-spring-dur .tl-spring-dur-hint { color: var(--c-text-faint); }
 
     /* read-only (spring-driven) value field */
@@ -609,7 +624,11 @@
     .tl-field.is-readonly .tl-field-value { color: var(--c-text-mut); }
     .tl-field-lock { position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
       display: flex; color: var(--c-text-faint); pointer-events: none; z-index: 4; }
-    .tl-field-wrap.is-locked .t-tt { left: 0; transform: translate(0, 4px) scale(var(--tt-scale));
+    /* render below the field: the locked Duration field sits at the top of the
+       scrollable .tl-inspector (overflow-y:auto), so an above-tooltip gets its
+       top clipped. Anchor to top:100% instead and grow downward. */
+    .tl-field-wrap.is-locked .t-tt { left: 0; bottom: auto; top: calc(100% + 8px);
+      transform: translate(0, -4px) scale(var(--tt-scale));
       transform-origin: 0 0; white-space: normal; width: 244px; text-align: left; font-size: 12px;
       line-height: 1.45; padding: 9px 11px; }
     .tl-field-wrap.is-locked:hover .t-tt { opacity: 1; transform: translate(0, 0) scale(1);
@@ -620,10 +639,11 @@
       display: flex; align-items: center; justify-content: center;
       background: #fff; border-radius: 12px; box-shadow: var(--card-shadow); }
 
-    /* ── shared dropdown surface (Figma node 580:1696) ──
-       container: rounded-12 p-8 + menu shadow; rows: h-40 rounded-8 px-12,
-       Inter Medium 13/16 #1b1b1b label with #979797 suffix; section headers:
-       Inter Regular 11/14 #8b8b8b, pt-12 pb-8 pl-12, no divider. */
+    /* ── shared dropdown surface (Figma node 580:4723) ──
+       container: rounded-12 px-6 py-8 + menu shadow; rows: h-32 rounded-8,
+       Inter 13/16 #1b1b1b label with #979797 suffix; section headers:
+       Inter Regular 11/14 #8b8b8b, pt-12 pb-8 pl-12. Group divider (580:4779)
+       is a full-width #f0f0f0 hairline (see .tl-menu-divider). */
     .tl-menu { background: #fff; border-radius: 12px; padding: 6px; box-shadow: var(--menu-shadow); }
     /* full-bleed divider: negative side margins cancel the .tl-menu 6px padding so
        the line spans the whole dropdown width; no top gap. */
@@ -631,8 +651,8 @@
     .tl-menu-search-input { width: 100%; height: 32px; box-sizing: border-box; border: none; outline: none;
       background: transparent; font: inherit; font-size: 13px; line-height: 16px; color: #1b1b1b; padding: 0 8px; }
     .tl-menu-search-input::placeholder { color: #999; }
-    .tl-menu-item { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 8px;
-      border-radius: 8px; font-size: 13px; font-weight: 500; line-height: 16px; color: #1b1b1b; cursor: pointer;
+    .tl-menu-item { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 8px;
+      border-radius: 8px; font-size: 13px; font-weight: 400; line-height: 16px; color: #1b1b1b; cursor: pointer;
       transition: background 0.1s ease, box-shadow 0.1s ease; }
     .tl-menu-item:hover { background: #f4f4f5; }
     .tl-menu-item:active { background: #ededee; }
@@ -645,6 +665,21 @@
     .tl-menu-empty { padding: 10px 8px; color: var(--c-disabled); font-size: 13px; }
     .tl-menu-section { padding: 12px 8px 8px; font-size: 11px; font-weight: 400; line-height: 14px;
       color: #8b8b8b; }
+    /* full-bleed group divider (Figma 580:4779) — #f0f0f0 1px hairline spanning
+       the whole dropdown width; the -6px sides cancel the .tl-menu 6px padding. */
+    .tl-menu-divider { height: 1px; background: #f0f0f0; margin: 6px -6px; }
+    /* leading row icon (Figma copy-03 / refresh-cw-03, 16px, #696969 stroke) */
+    .tl-menu-icon { display: flex; flex: none; color: #696969; }
+    /* dropdown header row (Figma 580:4781) — product name + version, non-clickable.
+       pt-12 pb-8 px-12, Inter Regular 11/14; "Refine" reads darker than the rest. */
+    .tl-menu-head { display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 10px 12px; font-size: 11px; line-height: 14px;
+      font-weight: 400; color: #8b8b8b; white-space: nowrap; pointer-events: none;
+      user-select: none; }
+    .tl-menu-head-name { color: #4c4c4c; }
+    .tl-menu-head-ver { flex: none; line-height: 14px; font-variant-numeric: tabular-nums; }
+    /* trailing chevron on link rows (Figma 581:2828 — #696969 right chevron) */
+    .tl-menu-chevr { display: flex; flex: none; color: #696969; }
 
     /* ═════ transitions.dev — menu dropdown (verbatim) ═════ */
     .t-dropdown {
@@ -748,6 +783,16 @@
     }
     /* below-variant for triggers near the panel top edge */
     .t-tt.tl-tt-below { bottom: auto; top: calc(100% + 8px); transform-origin: 50% 0; font-size: 12px; }
+    /* multi-line message variant (e.g. Accept error) — long text wraps to a
+       readable measure instead of one overflowing line. Right-anchored so the
+       wide bubble grows leftward and never clips off the panel edge. Mirrors the
+       .tl-field-wrap.is-locked .t-tt wrapping pattern. */
+    .t-tt.tl-tt-msg { left: auto; right: 0; width: 252px; white-space: normal;
+      overflow-wrap: break-word; text-wrap: pretty; text-align: left; line-height: 1.45;
+      padding: 9px 11px; transform-origin: 100% 0;
+      transform: translate(0, 0) scale(var(--tt-scale)); }
+    .t-tt-wrap:hover .t-tt.tl-tt-msg,
+    .t-tt-trigger:focus-visible + .t-tt.tl-tt-msg { transform: translate(0, 0) scale(1); }
 
     /* ═════ transitions.dev — panel reveal (per-phase distance/ease/scale) ═════ */
     /* base = closed / close-end state: resolved travel + scale come from the
@@ -837,6 +882,9 @@
       /* must sit above the header (z-index:40) so it overlays the whole panel */
       position: absolute; top: 0; right: 0; bottom: 0; z-index: 50;
       width: var(--refine-w, 360px); max-width: 100%; overflow: hidden;
+      /* shadow lives on the panel (not the inner) so its own overflow:hidden
+         doesn't clip it; the left edge then casts over the timeline */
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 2px 6px 0 rgba(0, 0, 0, 0.05), 0 4px 42px 0 rgba(0, 0, 0, 0.06);
       --panel-translate-x: var(--panel-close-distance);
       --panel-scale-now: var(--panel-scale-close);
       transform: translateX(calc(100% + var(--panel-translate-x))) scale(var(--panel-scale-now));
@@ -871,14 +919,12 @@
       width: var(--refine-w, 360px); height: 100%; box-sizing: border-box;
       display: flex; flex-direction: column;
       background: #fff; color: var(--c-text);
-      border-left: 1px solid #f0f0f0;
-      box-shadow: -10px 0 30px rgba(0,0,0,0.05);
       font-family: "Inter", system-ui, -apple-system, sans-serif;
     }
     /* header: title block (left) + Agent/Deterministic mode dropdown (right) */
-    /* match the timeline top bar exactly: 10px/14px padding, centered, 57px tall (36px row + 20 + 1px border) */
+    /* match the timeline top bar exactly: 7.5px/14px padding, centered, 52px tall (36px row + 15 + 1px border) */
     .tl-refine-head { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
-      gap: 8px; box-sizing: border-box; padding: 10px 14px;
+      gap: 8px; box-sizing: border-box; padding: 7.5px 14px;
       border-bottom: 1px solid #f0f0f0; }
     .tl-refine-titles { min-width: 0; }
     .tl-refine-titles h3 { font-size: 13px; font-weight: 500; line-height: 14px; color: #17181c; }
@@ -939,26 +985,46 @@
     .tl-scan-morph { position: relative; isolation: isolate; box-sizing: border-box;
       display: inline-flex; align-items: center; justify-content: center;
       margin-bottom: 20px;
-      width: var(--scan-idle-w, 122px); height: 35px; padding: 0 16px;
+      width: var(--scan-idle-w, 122px); height: 36px; padding: 0 12px;
       border: none; border-radius: 60px; cursor: pointer;
-      font: inherit; font-size: 13px; font-weight: 500; line-height: 14px; color: #0073e5;
-      background: rgba(0,115,229,0.04); text-shadow: 0 1px 3px rgba(0,0,0,0.04);
-      box-shadow: var(--drop-btn), var(--ring-blue);
+      font: inherit; font-size: 13px; font-weight: 500; line-height: 14px;
+      color: var(--c-blue); background: transparent;
+      box-shadow: var(--drop-btn);
+      white-space: nowrap;
       --resize-dur: 300ms; --resize-ease: cubic-bezier(0.22, 1, 0.36, 1);
       transition: width var(--resize-dur) var(--resize-ease),
         height var(--resize-dur) var(--resize-ease),
         border-radius var(--resize-dur) var(--resize-ease),
-        background var(--resize-dur) var(--resize-ease),
         color var(--resize-dur) var(--resize-ease),
         box-shadow var(--resize-dur) var(--resize-ease); }
+    .tl-scan-morph::before { content: ""; position: absolute; inset: 0; border-radius: inherit;
+      background: var(--c-blue-bg);
+      background: color(display-p3 0 0.451 0.898 / 0.06);
+      transition: background 0.12s ease; z-index: 0; }
+    .tl-scan-morph::after { content: ""; position: absolute; inset: 0; border-radius: inherit;
+      box-shadow: var(--ring-blue);
+      pointer-events: none; z-index: 2; }
     /* explicit refine-footer spacing for both idle + scanning states */
     .tl-refine-foot .tl-scan-morph { margin-bottom: 20px; }
-    .tl-scan-morph:hover:not(:disabled) { background: rgba(0,115,229,0.08); }
-    .tl-scan-morph:active:not(.is-scanning):not(:disabled) { scale: 0.98; }
-    .tl-scan-morph:disabled:not(.is-scanning) { cursor: default; opacity: 0.45; }
+    .tl-scan-morph:hover:not(:disabled):not(.is-scanning)::before {
+      background: var(--c-blue-bg-h); background: color(display-p3 0 0.451 0.898 / 0.10); }
+    .tl-scan-morph:active:not(.is-scanning):not(:disabled) { color: var(--c-blue-pressed); }
+    .tl-scan-morph:active:not(.is-scanning):not(:disabled)::before {
+      background: var(--c-blue-bg-h); background: color(display-p3 0 0.451 0.898 / 0.10); }
+    .tl-scan-morph:disabled:not(.is-scanning) { cursor: default; color: var(--c-blue); }
+    .tl-scan-morph:disabled:not(.is-scanning)::before {
+      background: var(--c-blue-bg); background: color(display-p3 0 0.451 0.898 / 0.06); }
+    .tl-scan-morph:disabled:not(.is-scanning) .tl-scan-label {
+      color: var(--c-blue-pressed); opacity: 0.5; }
     .tl-scan-morph.is-scanning { width: 100%; height: 49px; border-radius: 60px;
-      padding: 8px 16px; cursor: default; color: #676767; background: #fff;
-      text-shadow: none; box-shadow: inset 0 0 0 1px #f0f0f0; }
+      padding: 8px 16px; cursor: default; color: #676767; background: transparent;
+      box-shadow: none; }
+    .tl-scan-morph.is-scanning::before {
+      background: #fff;
+      transition: background var(--resize-dur) var(--resize-ease); }
+    .tl-scan-morph.is-scanning::after {
+      box-shadow: inset 0 0 0 1px #f0f0f0;
+      transition: box-shadow var(--resize-dur) var(--resize-ease); }
     /* Two faces share one grid cell and cross-blur (icon swap, 09) between the
        label and the icon+status; whichever is hidden fades out with blur+scale.
        overflow:hidden + nowrap keep the status copy on a single line while the
@@ -987,13 +1053,67 @@
        beam stays an absolute overlay filling the button instead of collapsing
        into flow as a flex sibling (which hid the beam and skewed the width). */
     .tl-scan-morph .tl-scan-beam { position: absolute; inset: 0; z-index: 0;
-      border-radius: 60px; pointer-events: none;
+      border-radius: inherit; pointer-events: none;
       animation: tl-fade-in 360ms var(--resize-ease) both; }
-    .tl-scan-beam-fill { display: block; width: 100%; height: 100%; border-radius: 10px; }
+    /* Beam radius is auto-detected from this fill child; inherit keeps it locked
+       to the button's own border-radius so the hairline traces the edge at any
+       size (idle pill ↔ scanning rect) without a hardcoded magic number. */
+    .tl-scan-beam-fill { display: block; width: 100%; height: 100%; border-radius: inherit; }
     @keyframes tl-fade-in { from { opacity: 0; } to { opacity: 1; } }
-    .tl-scan-ic { flex: 0 0 auto; width: 13px; height: 15px; color: #c4c4c4;
-      animation: tl-scan-spin 1.8s linear infinite; }
-    @keyframes tl-scan-spin { to { transform: rotate(360deg); } }
+    /* ── gated states (Figma 580:3595) — the panel is blocked until a live agent
+       is connected (/refine live) AND it has scanned the page's transitions.
+       Both screens center their content in the panel body. */
+    .tl-gate { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center;
+      padding: 24px 16px; animation: tl-fade-in 260ms var(--resize-ease, cubic-bezier(0.22,1,0.36,1)) both; }
+    .tl-gate-col { display: flex; flex-direction: column; align-items: center; text-align: center; }
+    /* "Before we start" */
+    .tl-gate-title { font-size: 15px; font-weight: 500; line-height: 21px; color: #2c2c2c;
+      text-wrap: balance; }
+    .tl-gate-text { margin: 4px 0 0; max-width: 250px; font-size: 13px; font-weight: 400; line-height: 21px;
+      color: #676767; text-wrap: pretty; }
+    .tl-gate-text .tl-code { color: #4b4b4b; }
+    /* "Agent is scanning your transitions" — pill with dot-matrix loader + a
+       line-style border beam tracing the capsule edge, with a subtext below. */
+    .tl-gate-pill-wrap { position: relative; }
+    .tl-gate-pill { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 6px;
+      height: 36px; padding: 6px 12px; border-radius: 36px; background: #fff; color: #17181c;
+      font-size: 13px; font-weight: 400; line-height: 14px; white-space: nowrap;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06), inset 0 0 0 1px rgba(196,196,196,0.10); }
+    .tl-gate-pill .tl-dotm { color: #17181c; }
+    .tl-gate-pill-wrap .tl-gate-beam { position: absolute; inset: 0; z-index: 0; border-radius: 36px;
+      pointer-events: none; animation: tl-fade-in 360ms var(--resize-ease, cubic-bezier(0.22,1,0.36,1)) both; }
+    .tl-gate-beam-fill { display: block; width: 100%; height: 100%; border-radius: 36px; background: #fff; }
+    .tl-gate-sub { margin: 16px 0 0; max-width: 244px; font-size: 12px; font-weight: 400; line-height: 14px;
+      color: #6f6f6f; text-wrap: pretty; }
+    @media (prefers-reduced-motion: reduce) {
+      .tl-gate, .tl-gate-pill-wrap .tl-gate-beam { animation: none !important; } }
+    /* dot-matrix loader — ported from @dotmatrix/dotm-square-14
+       (github.com/zzzzshawn/matrix, MIT). A 5×5 dot grid cross-fades through four
+       frame masks in the sequence 0→1→2→3→2→1, dot opacities x=1 / o=0.52 / .=0.08.
+       The original drives this with a JS stepped cycle; here each symmetry group of
+       dots owns one opacity @keyframes over a single 1.36s loop (no JS timer). */
+    .tl-dotm { flex: 0 0 auto; display: grid; width: 16px; height: 16px;
+      grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(5, 1fr);
+      gap: 1px; }
+    .tl-dotm-dot { align-self: center; justify-self: center; width: 100%; height: 100%;
+      border-radius: 50%; background: currentColor; opacity: 0.08;
+      animation-duration: 1.36s; animation-timing-function: linear; animation-iteration-count: infinite; }
+    .tl-dotm-a { animation-name: tl-dotm-a; }
+    .tl-dotm-b { animation-name: tl-dotm-b; }
+    .tl-dotm-c { animation-name: tl-dotm-c; }
+    .tl-dotm-d { animation-name: tl-dotm-d; }
+    .tl-dotm-e { animation-name: tl-dotm-e; }
+    .tl-dotm-f { animation-name: tl-dotm-f; }
+    .tl-dotm-g { animation-name: tl-dotm-g; }
+    .tl-dotm-h { opacity: 0.52; }
+    @keyframes tl-dotm-a { 0%{opacity:1} 16.667%{opacity:.08} 33.333%{opacity:.08} 50%{opacity:1} 66.667%{opacity:.08} 83.333%{opacity:.08} 100%{opacity:1} }
+    @keyframes tl-dotm-b { 0%{opacity:.08} 16.667%{opacity:.08} 33.333%{opacity:1} 50%{opacity:.08} 66.667%{opacity:1} 83.333%{opacity:.08} 100%{opacity:.08} }
+    @keyframes tl-dotm-c { 0%{opacity:.08} 16.667%{opacity:1} 33.333%{opacity:.08} 50%{opacity:1} 66.667%{opacity:.08} 83.333%{opacity:1} 100%{opacity:.08} }
+    @keyframes tl-dotm-d { 0%{opacity:.08} 16.667%{opacity:1} 33.333%{opacity:1} 50%{opacity:.08} 66.667%{opacity:1} 83.333%{opacity:1} 100%{opacity:.08} }
+    @keyframes tl-dotm-e { 0%{opacity:1} 16.667%{opacity:.52} 33.333%{opacity:.08} 50%{opacity:.52} 66.667%{opacity:.08} 83.333%{opacity:.52} 100%{opacity:1} }
+    @keyframes tl-dotm-f { 0%{opacity:.08} 16.667%{opacity:1} 33.333%{opacity:.52} 50%{opacity:.08} 66.667%{opacity:.52} 83.333%{opacity:1} 100%{opacity:.08} }
+    @keyframes tl-dotm-g { 0%{opacity:.08} 16.667%{opacity:.52} 33.333%{opacity:.08} 50%{opacity:.08} 66.667%{opacity:.08} 83.333%{opacity:.52} 100%{opacity:.08} }
+    .tl-scanning-row { display: inline-flex; align-items: center; gap: 6px; }
     /* loading status text — transitions.dev shimmer text (15) + text states swap (04) */
     .tl-refine-status-text {
       --shimmer-dur: 2000ms; --shimmer-base: #9a9a9a; --shimmer-highlight: #17181c;
@@ -1029,42 +1149,106 @@
     .tl-mode-row-check { flex: 0 0 auto; width: 16px; height: 16px; display: flex; color: #17181c; }
     @keyframes tl-fade-up { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
-    /* suggestion cards */
-    .tl-refine-summary { font-size: 12px; color: var(--c-text-mut); margin-bottom: 2px; }
-    .tl-sug { border: 1px solid var(--c-line); border-radius: 10px; padding: 12px 13px;
-      display: flex; flex-direction: column; gap: 8px; background: #fff;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
-    .tl-sug-top { display: flex; align-items: center; gap: 8px; }
-    .tl-sug-kind { font-size: 10px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase;
-      color: var(--c-blue); background: color(display-p3 0 0.451 0.898 / 0.08); padding: 2px 7px; border-radius: 5px; }
-    .tl-sug-prop { font-size: 12px; font-weight: 600; color: #171717; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .tl-sug-title { font-size: 13px; font-weight: 600; color: #171717; }
-    .tl-sug-delta { font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
-    .tl-sug-from { color: var(--c-text-faint); text-decoration: line-through; }
-    .tl-sug-arrow { color: var(--c-text-faint); }
-    .tl-sug-to { color: var(--c-blue); font-weight: 600; }
-    .tl-sug-reason { font-size: 12px; color: var(--c-text-mut); line-height: 1.45; text-wrap: balance; }
-    .tl-sug-apply { align-self: flex-start; font: inherit; font-size: 12px; font-weight: 500;
-      padding: 6px 12px; border-radius: 7px; border: none; cursor: pointer;
-      background: #171717; color: #fff; transition: background 0.12s ease, scale 0.12s ease; }
-    .tl-sug-apply:hover { background: #000; }
-    .tl-sug-apply:active { scale: 0.97; }
-    .tl-sug-apply.is-applied { background: color(display-p3 0 0.451 0.898 / 0.10); color: var(--c-blue);
-      cursor: default; display: flex; align-items: center; gap: 6px; }
+    /* suggestion cards (Figma node 580:9158) */
+    .tl-sug { box-sizing: border-box; display: flex; flex-direction: column; gap: 10px;
+      padding: 10px 12px 12px; background: #fff; border-radius: 12px; overflow: clip;
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.08); }
+    /* top row: member chip + property (or a single heading for replace cards) */
+    .tl-sug-head { display: flex; align-items: center; gap: 8px; min-height: 20px; }
+    .tl-sug-member { flex: none; display: inline-flex; align-items: center; height: 20px; padding: 0 6px;
+      border-radius: 50px; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.08);
+      font-size: 11px; font-weight: 400; line-height: 18px; color: #696969; white-space: nowrap; }
+    .tl-sug-prop { font-size: 13px; font-weight: 500; line-height: 18px; color: #171717; white-space: nowrap; }
+    /* full-bleed hairline (Figma 581:5970) — cancels the 12px card side padding */
+    .tl-sug-divider { height: 1px; background: #f1f1f1; margin: 0 -12px; }
+    /* colored category chip — color set by kind modifier below */
+    .tl-sug-cat { align-self: flex-start; display: inline-flex; align-items: center; height: 24px;
+      padding: 0 10px; border-radius: 50px; font-size: 13px; font-weight: 500; line-height: 16px;
+      white-space: nowrap; }
+    .tl-sug-cat.is-easing   { color: #a830fd; background: rgba(173,68,247,0.06); box-shadow: inset 0 0 0 1px rgba(173,68,247,0.18); }
+    .tl-sug-cat.is-duration { color: #3097fd; background: rgba(111,183,255,0.08); box-shadow: inset 0 0 0 1px rgba(48,151,253,0.18); }
+    .tl-sug-cat.is-scale    { color: #26953b; background: rgba(38,149,59,0.06);  box-shadow: inset 0 0 0 1px rgba(38,149,59,0.18); }
+    .tl-sug-cat.is-distance, .tl-sug-cat.is-delay { color: #c35c00; background: rgba(247,152,68,0.06); box-shadow: inset 0 0 0 1px rgba(205,115,36,0.18); }
+    .tl-sug-cat.is-replace  { color: #3097fd; background: rgba(111,183,255,0.08); box-shadow: inset 0 0 0 1px rgba(48,151,253,0.18); }
+    /* content stack */
+    .tl-sug-body { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+    .tl-sug-text { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+    .tl-sug-title { font-size: 12px; font-weight: 500; line-height: 16px; color: #1b1b1b; }
+    /* before/after delta — two stacked Roboto Mono lines (Figma 581:4469) */
+    .tl-sug-delta { display: flex; flex-direction: column;
+      font-family: "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px; font-weight: 400; line-height: 16px; }
+    .tl-sug-from { color: #7b7b7b; text-decoration: line-through; }
+    .tl-sug-to { color: #1b1b1b; }
+    .tl-sug-reason { font-size: 12px; font-weight: 400; line-height: 18px; color: #6d6d6d; }
+    /* shared white pill button (Figma 580:757) — card Apply + bottom-bar actions */
+    .tl-pill-btn { align-self: flex-start; box-sizing: border-box; display: inline-flex; align-items: center;
+      justify-content: center; gap: 8px; height: 32px; padding: 6px 12px; border: none; cursor: pointer;
+      border-radius: 36px; background: #fff;
+      font: inherit; font-size: 13px; font-weight: 500; line-height: 14px; color: #2b2b2b; white-space: nowrap;
+      box-shadow: 0 1px 3px 0 rgba(0,0,0,0.04),
+        inset 0 0 0 1px rgba(0,0,0,0.06), inset 0 -1px 0 0 rgba(0,0,0,0.1), inset 0 0 0 1px rgba(196,196,196,0.1);
+      transition: background 0.12s ease, scale 0.12s ease, opacity 0.12s ease; }
+    .tl-pill-btn .tl-dim { color: #696969; }
+    .tl-pill-btn:hover:not(:disabled) { background: #fafafa; }
+    .tl-pill-btn:active:not(:disabled) { scale: 0.98; }
+    .tl-pill-btn:disabled { opacity: 0.45; cursor: default; }
+    /* applied state — GRAY, never green (matches Accept icon --c-text #17181c) */
+    .tl-pill-btn.is-applied { color: var(--c-text); cursor: default; }
+    .tl-pill-btn.is-applied svg path { stroke: var(--c-text); }
+    /* card resize (transitions.dev 01-card-resize): width tween on Apply -> Applied.
+       250ms cubic-bezier(0.22,1,0.36,1); width is driven explicitly from JS. */
+    .tl-pill-btn.tl-apply-btn {
+      transition: background 0.12s ease, scale 0.12s ease, opacity 0.12s ease,
+                  width 250ms cubic-bezier(0.22, 1, 0.36, 1);
+      will-change: width; }
+    /* success check (transitions.dev 10-success-check): fade + rotate + Y-bob +
+       blur on the wrapper, stroke-draw on the path. GRAY stroke. */
+    .tl-sug-check { display: inline-flex; transform-origin: center; opacity: 0;
+      will-change: transform, opacity, filter; }
+    .tl-sug-check svg { display: block; overflow: visible; }
+    /* stroke-dasharray = path.getTotalLength() of ICONS.accept "M4 8.4268 L6.46155
+       11.19223 L12 4.97001" (~12.03 user units, rounded up to 13). JS also sets it
+       inline per-render via getTotalLength() for sub-pixel safety. */
+    .tl-sug-check svg path { stroke-dasharray: 13; stroke-dashoffset: 13; }
+    .tl-sug-check[data-state="in"] {
+      animation:
+        tl-check-fade   500ms cubic-bezier(0.22, 1, 0.36, 1)   forwards,
+        tl-check-rotate 500ms cubic-bezier(0.22, 1, 0.36, 1)   forwards,
+        tl-check-blur   500ms cubic-bezier(0.22, 1, 0.36, 1)   forwards,
+        tl-check-bob    500ms cubic-bezier(0.34, 1.35, 0.64, 1) forwards; }
+    .tl-sug-check[data-state="in"] svg path {
+      animation: tl-check-draw 500ms cubic-bezier(0.22, 1, 0.36, 1) 80ms forwards; }
+    @keyframes tl-check-fade   { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes tl-check-rotate { from { transform: rotate(80deg); } to { transform: rotate(0deg); } }
+    @keyframes tl-check-blur   { from { filter: blur(10px); } to { filter: blur(0); } }
+    @keyframes tl-check-bob    { from { translate: 0 40px; } to { translate: 0 0; } }
+    @keyframes tl-check-draw   { to { stroke-dashoffset: 0; } }
+    /* results action bar (Figma node 581:6285): white sticky bar with top hairline
+       holding two equal-width pill buttons (Apply all + Scan again). */
+    .tl-refine-foot.is-bar { padding: 8px 16px; gap: 8px; justify-content: stretch;
+      background: #fff; border-top: 1px solid #f0f0f0; }
+    .tl-refine-foot.is-bar .tl-pill-btn { flex: 1; align-self: stretch; }
     .tl-refine-empty { font-size: 13px; color: var(--c-text-mut); padding: 18px 4px; text-align: center; line-height: 1.5; text-wrap: balance; }
     .tl-refine-error { font-size: 13px; color: #c0392b; padding: 14px; line-height: 1.5;
       background: rgba(192,57,43,0.06); border-radius: 10px; }
     .tl-refine-error code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
     .tl-refine-foot { padding: 12px 20px; display: flex; gap: 8px; }
+    /* results action bar (Figma 581:6285) — sticky white bar, top hairline, two equal pills */
+    .tl-refine-foot.is-bar { padding: 8px 16px; gap: 8px; justify-content: stretch;
+      background: #fff; border-top: 1px solid #f0f0f0; }
+    .tl-refine-foot.is-bar .tl-pill-btn { flex: 1; align-self: stretch; }
     @media (prefers-reduced-motion: reduce) {
       .tl-refine-panel { transition: none; }
-      .tl-scan-ic { animation: none; }
+      .tl-dotm-dot { animation: none !important; }
       .tl-refine-status-text, .tl-sug { animation: none; }
       .t-shimmer::before { animation: none !important; }
       .t-text-swap { transition: none !important; }
       .tl-refine-results .t-stagger-line { transition: none !important; }
       .t-resize, .tl-scan-morph { transition: none !important; }
+      .tl-pill-btn.tl-apply-btn { transition: background 0.12s ease, scale 0.12s ease, opacity 0.12s ease !important; }
+      .tl-sug-check { animation: none !important; opacity: 1; }
+      .tl-sug-check svg path { animation: none !important; stroke-dashoffset: 0 !important; }
       .tl-scan-face { transition: none !important; }
       .tl-scan-beam { animation: none !important; }
       .tl-pill { animation: none !important; }
@@ -1089,6 +1273,12 @@
     import { BorderBeam } from "border-beam";
     const { createElement: h, useState, useEffect, useLayoutEffect, useRef, useMemo,
             useCallback, useSyncExternalStore, createContext, useContext } = React;
+
+    // Single source of truth for the displayed version. When served via the relay
+    // (inject.js), the build injects window.__TX_REFINE_VERSION from package.json so
+    // it never drifts; the fallback mirrors the current package.json version for the
+    // standalone demo.html.
+    const REFINE_VERSION = (typeof window !== "undefined" && window.__TX_REFINE_VERSION) || "0.3.4";
 
     // ── helpers ──
     function parseCssTime(v) { const t=v.trim(); if(t.endsWith("ms")) return parseFloat(t); if(t.endsWith("s")) return parseFloat(t)*1000; const n=parseFloat(t); return isNaN(n)?0:n; }
@@ -1366,8 +1556,8 @@
       play:    {vb:"0 0 10 12", svg:`<path d="M9.49453 6.92883L1.54117 11.8508C0.866207 12.2681 0 11.7628 0 10.9216V1.07765C0 0.237764 0.864957 -0.268832 1.54117 0.149776L9.49453 5.07175C9.64807 5.16524 9.7757 5.30037 9.86447 5.46344C9.95324 5.62651 10 5.81172 10 6.00029C10 6.18885 9.95324 6.37407 9.86447 6.53714C9.7757 6.70021 9.64807 6.83534 9.49453 6.92883Z" fill="currentColor"/>`},
       pause:   {vb:"0 0 24 24", svg:`<path d="M5.75 3C4.7835 3 4 3.7835 4 4.75V19.25C4 20.2165 4.7835 21 5.75 21H8.25C9.2165 21 10 20.2165 10 19.25V4.75C10 3.7835 9.2165 3 8.25 3H5.75Z" fill="currentColor"/><path d="M15.75 3C14.7835 3 14 3.7835 14 4.75V19.25C14 20.2165 14.7835 21 15.75 21H18.25C19.2165 21 20 20.2165 20 19.25V4.75C20 3.7835 19.2165 3 18.25 3H15.75Z" fill="currentColor"/>`},
       stop:    {vb:"0 0 24 24", svg:`<path fill-rule="evenodd" clip-rule="evenodd" d="M5.32378 3C5.3325 3 5.34124 3 5.35 3L18.6762 3C18.9337 2.99998 19.1702 2.99997 19.3679 3.01612C19.581 3.03353 19.8142 3.07339 20.0445 3.19074C20.3738 3.35852 20.6415 3.62624 20.8093 3.95552C20.9266 4.18583 20.9665 4.419 20.9839 4.63213C21 4.82981 21 5.06629 21 5.32377V18.6762C21 18.9337 21 19.1702 20.9839 19.3679C20.9665 19.581 20.9266 19.8142 20.8093 20.0445C20.6415 20.3738 20.3738 20.6415 20.0445 20.8093C19.8142 20.9266 19.581 20.9665 19.3679 20.9839C19.1702 21 18.9337 21 18.6762 21H5.32377C5.06629 21 4.82981 21 4.63213 20.9839C4.419 20.9665 4.18583 20.9266 3.95552 20.8093C3.62624 20.6415 3.35852 20.3738 3.19074 20.0445C3.07339 19.8142 3.03353 19.581 3.01612 19.3679C2.99997 19.1702 2.99998 18.9337 3 18.6762L3 5.35C3 5.34124 3 5.3325 3 5.32379C2.99998 5.0663 2.99997 4.82982 3.01612 4.63213C3.03353 4.419 3.07339 4.18583 3.19074 3.95552C3.35852 3.62624 3.62624 3.35852 3.95552 3.19074C4.18583 3.07339 4.419 3.03353 4.63213 3.01612C4.82982 2.99997 5.0663 2.99998 5.32378 3Z" fill="currentColor"/>`},
-      restart: {vb:"0 0 16 16", svg:`<path d="M1.33333 6.66667C1.33333 6.66667 2.66999 4.84548 3.75589 3.75883C4.84179 2.67218 6.3424 2 8 2C11.3137 2 14 4.68629 14 8C14 11.3137 11.3137 14 8 14C5.2646 14 2.95674 12.1695 2.23451 9.66667M5.33333 6.66667H1.33333V2.66667" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`},
-      copy:    {vb:"0 0 16 16", svg:`<path d="M5.3335 5.33325V3.46659C5.3335 2.71985 5.3335 2.34648 5.47882 2.06126C5.60665 1.81038 5.81063 1.60641 6.06151 1.47858C6.34672 1.33325 6.72009 1.33325 7.46683 1.33325H12.5335C13.2802 1.33325 13.6536 1.33325 13.9388 1.47858C14.1897 1.60641 14.3937 1.81038 14.5215 2.06126C14.6668 2.34648 14.6668 2.71985 14.6668 3.46659V8.53325C14.6668 9.27999 14.6668 9.65336 14.5215 9.93857C14.3937 10.1895 14.1897 10.3934 13.9388 10.5213C13.6536 10.6666 13.2802 10.6666 12.5335 10.6666H10.6668M3.46683 14.6666H8.5335C9.28023 14.6666 9.6536 14.6666 9.93882 14.5213C10.1897 14.3934 10.3937 14.1895 10.5215 13.9386C10.6668 13.6534 10.6668 13.28 10.6668 12.5333V7.46658C10.6668 6.71985 10.6668 6.34648 10.5215 6.06126C10.3937 5.81038 10.1897 5.60641 9.93882 5.47858C9.6536 5.33325 9.28023 5.33325 8.5335 5.33325H3.46683C2.72009 5.33325 2.34672 5.33325 2.06151 5.47858C1.81063 5.60641 1.60665 5.81038 1.47882 6.06126C1.3335 6.34648 1.3335 6.71985 1.3335 7.46658V12.5333C1.3335 13.28 1.3335 13.6534 1.47882 13.9386C1.60665 14.1895 1.81063 14.3934 2.06151 14.5213C2.34672 14.6666 2.72009 14.6666 3.46683 14.6666Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`},
+      restart: {vb:"0 0 16 16", svg:`<g transform="translate(1.75,1.25)"><path d="M7.47222 12.75C7.47222 12.75 7.9912 12.6772 10.1391 10.5684C12.287 8.45955 12.287 5.04046 10.1391 2.93162C9.37809 2.18446 8.44956 1.70202 7.47222 1.4843M7.47222 9.15L7.47222 12.75H11.1389M5.02778 0.750117C5.02778 0.750117 4.5088 0.82291 2.36091 2.93174C0.213029 5.04057 0.213029 8.45966 2.36091 10.5685C3.12191 11.3157 4.05044 11.7981 5.02778 12.0158M5.02778 4.35L5.02778 0.750117L1.36111 0.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></g>`},
+      copy:    {vb:"0 0 16 16", svg:`<path d="M5.6 5.6V3.92C5.6 3.24794 5.6 2.91191 5.73079 2.65521C5.84584 2.42942 6.02942 2.24584 6.25521 2.13079C6.51191 2 6.84794 2 7.52 2H12.08C12.7521 2 13.0881 2 13.3448 2.13079C13.5706 2.24584 13.7542 2.42942 13.8692 2.65521C14 2.91191 14 3.24794 14 3.92V8.48C14 9.15206 14 9.4881 13.8692 9.74479C13.7542 9.97058 13.5706 10.1542 13.3448 10.2692C13.0881 10.4 12.7521 10.4 12.08 10.4H10.4M3.92 14H8.48C9.15206 14 9.48809 14 9.74479 13.8692C9.97058 13.7542 10.1542 13.5706 10.2692 13.3448C10.4 13.0881 10.4 12.7521 10.4 12.08V7.52C10.4 6.84794 10.4 6.51191 10.2692 6.25521C10.1542 6.02942 9.97058 5.84584 9.74479 5.73079C9.48809 5.6 9.15206 5.6 8.48 5.6H3.92C3.24794 5.6 2.91191 5.6 2.65521 5.73079C2.42942 5.84584 2.24584 6.02942 2.13079 6.25521C2 6.51191 2 6.84794 2 7.52V12.08C2 12.7521 2 13.0881 2.13079 13.3448C2.24584 13.5706 2.42942 13.7542 2.65521 13.8692C2.91191 14 3.24794 14 3.92 14Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`},
       check:   {vb:"0 0 16 16", svg:`<path d="M3 7.88889L5.76923 11L12 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`},
       chevron: {vb:"0 0 16 16", svg:`<path fill-rule="evenodd" clip-rule="evenodd" d="M4.46967 6.46967C4.76256 6.17678 5.23744 6.17678 5.53033 6.46967L8 8.93934L10.4697 6.46967C10.7626 6.17678 11.2374 6.17678 11.5303 6.46967C11.8232 6.76256 11.8232 7.23744 11.5303 7.53033L8.53033 10.5303C8.23744 10.8232 7.76256 10.8232 7.46967 10.5303L4.46967 7.53033C4.17678 7.23744 4.17678 6.76256 4.46967 6.46967Z" fill="currentColor"/>`},
       gear:    {vb:"0 0 16 16", svg:`<path d="M8.00016 9.99992C9.10473 9.99992 10.0002 9.10449 10.0002 7.99992C10.0002 6.89535 9.10473 5.99992 8.00016 5.99992C6.89559 5.99992 6.00016 6.89535 6.00016 7.99992C6.00016 9.10449 6.89559 9.99992 8.00016 9.99992Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M12.485 9.8181C12.4043 10.0009 12.3803 10.2037 12.4159 10.4003C12.4516 10.5969 12.5453 10.7783 12.685 10.9211L12.7214 10.9575C12.8341 11.0701 12.9235 11.2038 12.9845 11.3509C13.0455 11.498 13.0769 11.6558 13.0769 11.8151C13.0769 11.9744 13.0455 12.1321 12.9845 12.2792C12.9235 12.4264 12.8341 12.5601 12.7214 12.6726C12.6088 12.7853 12.4751 12.8747 12.328 12.9357C12.1808 12.9967 12.0231 13.0281 11.8638 13.0281C11.7045 13.0281 11.5468 12.9967 11.3996 12.9357C11.2525 12.8747 11.1188 12.7853 11.0062 12.6726L10.9699 12.6363C10.827 12.4966 10.6456 12.4028 10.449 12.3672C10.2524 12.3315 10.0496 12.3556 9.86683 12.4363C9.68757 12.5131 9.5347 12.6407 9.42702 12.8033C9.31933 12.9659 9.26155 13.1564 9.26077 13.3514V13.4545C9.26077 13.7759 9.13306 14.0842 8.90575 14.3116C8.67843 14.5389 8.37012 14.6666 8.04865 14.6666C7.72717 14.6666 7.41887 14.5389 7.19155 14.3116C6.96423 14.0842 6.83653 13.7759 6.83653 13.4545V13.3999C6.83183 13.1993 6.7669 13.0048 6.65017 12.8416C6.53344 12.6783 6.37031 12.554 6.18198 12.4848C5.99918 12.4041 5.79641 12.38 5.59981 12.4157C5.4032 12.4513 5.22179 12.545 5.07895 12.6848L5.04259 12.7211C4.93001 12.8338 4.79633 12.9232 4.64918 12.9842C4.50203 13.0452 4.3443 13.0766 4.18501 13.0766C4.02572 13.0766 3.86799 13.0452 3.72084 12.9842C3.57369 12.9232 3.44001 12.8338 3.32744 12.7211C3.21474 12.6086 3.12533 12.4749 3.06433 12.3277C3.00333 12.1806 2.97194 12.0228 2.97194 11.8636C2.97194 11.7043 3.00333 11.5465 3.06433 11.3994C3.12533 11.2522 3.21474 11.1186 3.32744 11.006L3.3638 10.9696C3.50352 10.8268 3.59724 10.6454 3.63289 10.4488C3.66854 10.2522 3.64447 10.0494 3.5638 9.86658C3.48697 9.68733 3.35941 9.53445 3.19681 9.42677C3.03421 9.31909 2.84367 9.2613 2.64865 9.26052H2.54562C2.22414 9.26052 1.91583 9.13282 1.68852 8.9055C1.4612 8.67819 1.3335 8.36988 1.3335 8.0484C1.3335 7.72693 1.4612 7.41862 1.68852 7.1913C1.91583 6.96399 2.22414 6.83628 2.54562 6.83628H2.60016C2.80077 6.83159 2.99532 6.76666 3.15853 6.64992C3.32173 6.53319 3.44605 6.37006 3.51531 6.18174C3.59599 5.99894 3.62006 5.79616 3.58441 5.59956C3.54876 5.40296 3.45503 5.22154 3.31531 5.07871L3.27895 5.04234C3.16625 4.92977 3.07685 4.79609 3.01585 4.64894C2.95485 4.50179 2.92345 4.34406 2.92345 4.18477C2.92345 4.02548 2.95485 3.86775 3.01585 3.7206C3.07685 3.57345 3.16625 3.43976 3.27895 3.32719C3.39152 3.21449 3.52521 3.12509 3.67236 3.06409C3.81951 3.00309 3.97723 2.97169 4.13653 2.97169C4.29582 2.97169 4.45355 3.00309 4.6007 3.06409C4.74785 3.12509 4.88153 3.21449 4.9941 3.32719L5.03047 3.36355C5.1733 3.50327 5.35472 3.597 5.55132 3.63265C5.74792 3.6683 5.9507 3.64423 6.1335 3.56355H6.18198C6.36123 3.48673 6.51411 3.35916 6.62179 3.19656C6.72948 3.03396 6.78726 2.84343 6.78804 2.6484V2.54537C6.78804 2.2239 6.91575 1.91559 7.14306 1.68827C7.37038 1.46096 7.67869 1.33325 8.00016 1.33325C8.32164 1.33325 8.62994 1.46096 8.85726 1.68827C9.08458 1.91559 9.21228 2.2239 9.21228 2.54537V2.59992C9.21306 2.79494 9.27085 2.98548 9.37853 3.14808C9.48621 3.31068 9.63909 3.43824 9.81834 3.51507C10.0011 3.59575 10.2039 3.61981 10.4005 3.58416C10.5971 3.54852 10.7785 3.45479 10.9214 3.31507L10.9577 3.27871C11.0703 3.16601 11.204 3.0766 11.3511 3.0156C11.4983 2.9546 11.656 2.92321 11.8153 2.92321C11.9746 2.92321 12.1323 2.9546 12.2795 3.0156C12.4266 3.0766 12.5603 3.16601 12.6729 3.27871C12.7856 3.39128 12.875 3.52496 12.936 3.67211C12.997 3.81926 13.0284 3.97699 13.0284 4.13628C13.0284 4.29557 12.997 4.4533 12.936 4.60045C12.875 4.7476 12.7856 4.88128 12.6729 4.99386L12.6365 5.03022C12.4968 5.17306 12.4031 5.35447 12.3674 5.55108C12.3318 5.74768 12.3558 5.95045 12.4365 6.13325V6.18174C12.5134 6.36099 12.6409 6.51387 12.8035 6.62155C12.9661 6.72923 13.1567 6.78702 13.3517 6.7878H13.4547C13.7762 6.7878 14.0845 6.9155 14.3118 7.14282C14.5391 7.37014 14.6668 7.67844 14.6668 7.99992C14.6668 8.32139 14.5391 8.6297 14.3118 8.85702C14.0845 9.08433 13.7762 9.21204 13.4547 9.21204H13.4002C13.2051 9.21282 13.0146 9.2706 12.852 9.37829C12.6894 9.48597 12.5618 9.63885 12.485 9.8181Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`},
@@ -1378,11 +1568,17 @@
       scan:    {vb:"0 0 13 15", svg:`<path fill-rule="evenodd" clip-rule="evenodd" d="M6.76556 1.2204C6.60067 1.12222 6.39933 1.12222 6.23444 1.2204L4.94588 1.98765C4.68515 2.1429 4.35488 2.04501 4.20822 1.76901C4.06156 1.49301 4.15403 1.14341 4.41477 0.988161L5.70333 0.220909C6.198 -0.0736362 6.802 -0.0736362 7.29667 0.220909L8.58523 0.988161C8.84597 1.14341 8.93844 1.49301 8.79178 1.76901C8.64512 2.04501 8.31485 2.1429 8.05412 1.98765L6.76556 1.2204ZM2.94914 2.51871C3.0958 2.79471 3.00333 3.14431 2.74259 3.29956L1.35944 4.12314C1.18888 4.2247 1.08333 4.41574 1.08333 4.62289L1.08333 6.16211C1.08333 6.47878 0.840821 6.73549 0.541667 6.73549C0.242513 6.73549 4.30478e-07 6.47878 4.73526e-07 6.16211L6.02669e-07 4.62289C6.45717e-07 4.00144 0.316652 3.42832 0.828326 3.12365L2.21148 2.30007C2.47221 2.14482 2.80248 2.24271 2.94914 2.51871ZM10.0509 2.51871C10.1975 2.24271 10.5278 2.14482 10.7885 2.30007L12.1717 3.12365C12.6833 3.42832 13 4.00144 13 4.62288V6.16211C13 6.47878 12.7575 6.73549 12.4583 6.73549C12.1592 6.73549 11.9167 6.47878 11.9167 6.16211V4.62288C11.9167 4.41574 11.8111 4.2247 11.6406 4.12314L10.2574 3.29956C9.99667 3.14431 9.9042 2.79471 10.0509 2.51871ZM12.4583 8.26451C12.7575 8.26451 13 8.52122 13 8.83789V10.3771C13 10.9986 12.6833 11.5717 12.1717 11.8763L10.7885 12.6999C10.5278 12.8552 10.1975 12.7573 10.0509 12.4813C9.9042 12.2053 9.99668 11.8557 10.2574 11.7004L11.6406 10.8769C11.8111 10.7753 11.9167 10.5843 11.9167 10.3771V8.83789C11.9167 8.52122 12.1592 8.26451 12.4583 8.26451ZM0.541667 8.26451C0.840821 8.26451 1.08333 8.52122 1.08333 8.83789L1.08333 10.3771C1.08333 10.5843 1.18888 10.7753 1.35944 10.8769L2.74259 11.7004C3.00332 11.8557 3.0958 12.2053 2.94913 12.4813C2.80247 12.7573 2.47221 12.8552 2.21147 12.6999L0.828326 11.8763C0.31665 11.5717 -4.30478e-08 10.9986 0 10.3771L1.29143e-07 8.83789C1.72191e-07 8.52122 0.242513 8.26451 0.541667 8.26451ZM4.20821 13.231C4.35488 12.955 4.68514 12.8571 4.94588 13.0123L6.23444 13.7796C6.39933 13.8778 6.60067 13.8778 6.76556 13.7796L8.05412 13.0123C8.31486 12.8571 8.64512 12.955 8.79179 13.231C8.93845 13.507 8.84598 13.8566 8.58524 14.0118L7.29667 14.7791C6.802 15.0736 6.198 15.0736 5.70333 14.7791L4.41476 14.0118C4.15402 13.8566 4.06155 13.507 4.20821 13.231Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M4.62357 6.35324C4.77315 6.07899 5.10443 5.98503 5.3635 6.14337L6.49997 6.83792L7.63643 6.14337C7.8955 5.98503 8.22678 6.07899 8.37636 6.35324C8.52594 6.62748 8.43717 6.97816 8.1781 7.13649L7.04164 7.83104V9.22014C7.04164 9.53681 6.79912 9.79353 6.49997 9.79353C6.20082 9.79353 5.9583 9.53681 5.9583 9.22014V7.83104L4.82184 7.13649C4.56276 6.97816 4.474 6.62748 4.62357 6.35324Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M6.49998 0.213281C6.79913 0.213281 7.04164 0.469993 7.04164 0.786663V3.10408C7.04164 3.42075 6.79913 3.67746 6.49998 3.67746C6.20082 3.67746 5.95831 3.42075 5.95831 3.10408V0.786663C5.95831 0.469993 6.20082 0.213281 6.49998 0.213281ZM0.349927 3.83504C0.499504 3.56079 0.830782 3.46683 1.08986 3.62516L3.02114 4.80548C3.28022 4.96381 3.36898 5.31449 3.21941 5.58873C3.06983 5.86297 2.73855 5.95694 2.47948 5.7986L0.548191 4.61829C0.289116 4.45995 0.20035 4.10928 0.349927 3.83504ZM12.65 3.83504C12.7996 4.10928 12.7108 4.45995 12.4518 4.61829L10.5205 5.7986C10.2614 5.95694 9.93012 5.86297 9.78055 5.58873C9.63097 5.31449 9.71974 4.96381 9.97881 4.80548L11.9101 3.62516C12.1692 3.46683 12.5004 3.56079 12.65 3.83504ZM3.24873 9.39335C3.3983 9.6676 3.30954 10.0183 3.05046 10.1766L1.08986 11.3748C0.830782 11.5332 0.499504 11.4392 0.349927 11.165C0.20035 10.8907 0.289115 10.54 0.548191 10.3817L2.50879 9.18348C2.76787 9.02515 3.09915 9.11911 3.24873 9.39335ZM9.75123 9.39335C9.90081 9.11911 10.2321 9.02515 10.4912 9.18348L12.4518 10.3817C12.7108 10.54 12.7996 10.8907 12.65 11.165C12.5004 11.4392 12.1692 11.5332 11.9101 11.3748L9.94949 10.1766C9.69042 10.0183 9.60165 9.6676 9.75123 9.39335ZM6.49998 11.2867C6.79913 11.2867 7.04164 11.5434 7.04164 11.8601V14.2133C7.04164 14.53 6.79913 14.7867 6.49998 14.7867C6.20082 14.7867 5.95831 14.53 5.95831 14.2133V11.8601C5.95831 11.5434 6.20082 11.2867 6.49998 11.2867Z" fill="currentColor"/>`}
     };
     ICONS.minimize = ICONS.chevron;
+    // right chevron — exact Figma artwork (581:2828 "Chevron small down (Stroke)")
+    // rotated -90° about its centre and centred in a 16px box.
+    ICONS.chevronr = {vb:"0 0 16 16", svg:`<g transform="translate(8,8) rotate(-90) translate(-3.75,-2.25)"><path fill-rule="evenodd" clip-rule="evenodd" d="M0.21967 0.21967C0.512563 -0.0732233 0.987437 -0.0732233 1.28033 0.21967L3.75 2.68934L6.21967 0.21967C6.51256 -0.0732233 6.98744 -0.0732233 7.28033 0.21967C7.57322 0.512563 7.57322 0.987437 7.28033 1.28033L4.28033 4.28033C3.98744 4.57322 3.51256 4.57322 3.21967 4.28033L0.21967 1.28033C-0.0732233 0.987437 -0.0732233 0.512563 0.21967 0.21967Z" fill="currentColor"/></g>`};
     ICONS.close = {vb:"0 0 16 16", svg:`<path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`};
     ICONS.play = {vb:"0 0 16 16", svg:`<path d="M5 3.5L12 8L5 12.5V3.5Z" fill="currentColor"/>`};
     ICONS.pause = {vb:"0 0 16 16", svg:`<path d="M5 3.5H6.8V12.5H5V3.5ZM9.2 3.5H11V12.5H9.2V3.5Z" fill="currentColor"/>`};
     // dots-vertical (Figma node 580:4819) — vertical "⋮" overflow icon
     ICONS.dotsv = {vb:"0 0 16 16", svg:`<path fill-rule="evenodd" clip-rule="evenodd" d="M6.66667 8C6.66667 7.26362 7.26362 6.66667 8 6.66667C8.73638 6.66667 9.33333 7.26362 9.33333 8C9.33333 8.73638 8.73638 9.33333 8 9.33333C7.26362 9.33333 6.66667 8.73638 6.66667 8Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M6.66667 3.33333C6.66667 2.59695 7.26362 2 8 2C8.73638 2 9.33333 2.59695 9.33333 3.33333C9.33333 4.06971 8.73638 4.66667 8 4.66667C7.26362 4.66667 6.66667 4.06971 6.66667 3.33333Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M6.66667 12.6667C6.66667 11.9303 7.26362 11.3333 8 11.3333C8.73638 11.3333 9.33333 11.9303 9.33333 12.6667C9.33333 13.403 8.73638 14 8 14C7.26362 14 6.66667 13.403 6.66667 12.6667Z" fill="currentColor"/>`};
+    // accept checkmark (Figma node 580:9057) — slimmer 1.5px check centered in a
+    // square 16-frame (the glyph spans ~50% width, like the source icon frame).
+    ICONS.accept = {vb:"0 0 16 16", svg:`<path d="M4 8.4268L6.46155 11.19223L12 4.97001" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`};
     function Ic({name, size=16}){
       const ic = ICONS[name];
       if(!ic) return null;
@@ -1392,6 +1588,15 @@
       const w = +(size * vw / m).toFixed(2), ht = +(size * vh / m).toFixed(2);
       return h("svg",{width:w,height:ht,viewBox:ic.vb,fill:"none",xmlns:"http://www.w3.org/2000/svg",
         style:{display:"block"},dangerouslySetInnerHTML:{__html:ic.svg}});
+    }
+
+    // dot-matrix loader (ported from @dotmatrix/dotm-square-14). 25 dots laid out
+    // 5×5; each cell maps to a symmetry group a–h whose opacity @keyframes replays
+    // the source's 0→1→2→3→2→1 frame sequence. Inherits text color via currentColor.
+    const DOTM_GROUPS = "ABCBADEFEDCGHGCBEFEBABCBA";
+    function DotmLoader({className}){
+      return h("span",{className:cx("tl-dotm",className),"aria-hidden":"true"},
+        ...DOTM_GROUPS.split("").map((g,i)=>h("span",{key:i,className:"tl-dotm-dot tl-dotm-"+g.toLowerCase()})));
     }
 
     // portaled, origin-aware dropdown surface (transitions.dev menu-dropdown)
@@ -1463,8 +1668,9 @@
         target);
     }
 
-    function MenuItem({active,disabled,onClick,right,children}){
+    function MenuItem({active,disabled,onClick,left,right,children}){
       return h("div",{className:cx("tl-menu-item",disabled&&"disabled"),onClick:disabled?undefined:onClick},
+        left,
         h("span",{className:"tl-menu-item-label"},children),
         right);
     }
@@ -1524,9 +1730,64 @@
       },[text]);
       return h("span",{ref:setEl,className:"tl-refine-status-text t-shimmer t-text-swap"});
     }
-    // Results entrance — transitions.dev texts reveal (18): the summary and each
-    // suggestion card are stagger lines that rise + unblur in sequence on mount.
-    function RefineResults({summary,suggestions,appliedIds,onApply}){
+    // Results entrance — transitions.dev texts reveal (18): each suggestion card
+    // is a stagger line that rises + unblur in sequence on mount.
+    function resolveSugMember(s, lanes){
+      const direct=(s.patch&&s.patch.member)||s.member;
+      if(direct) return direct;
+      if(!lanes||!s.property||s.property==="all") return null;
+      const matches=lanes.filter(t=>t.property===s.property&&t.member);
+      if(!matches.length) return null;
+      const names=[...new Set(matches.map(t=>t.member))];
+      return names.length===1?names[0]:matches[0].member;
+    }
+    // Apply button — card resize (transitions.dev 01) tweens the width on
+    // Apply -> Applied, and the gray checkmark plays the success check (10):
+    // fade + rotate + Y-bob + blur on the wrapper, stroke-draw on the path.
+    // The same <button> node is reused across states so width can tween.
+    function ApplyBtn({applied,onApply}){
+      const ref=useRef(null);
+      const lastW=useRef(0);     // width captured while showing "Apply"
+      const prev=useRef(applied);
+      useLayoutEffect(()=>{
+        const btn=ref.current;if(!btn)return;
+        const justApplied=applied&&!prev.current;
+        if(applied){
+          const chk=btn.querySelector(".tl-sug-check");
+          if(chk){
+            const path=chk.querySelector("svg path");
+            if(path){ const len=Math.ceil(path.getTotalLength());   // exact path length
+              path.style.strokeDasharray=len; path.style.strokeDashoffset=len; }
+            if(justApplied){
+              // card-resize: explicit from(old "Apply") -> to(new auto) width tween
+              const to=btn.getBoundingClientRect().width, from=lastW.current;
+              if(from&&to&&Math.abs(from-to)>0.5){
+                btn.style.width=from+"px";
+                void btn.offsetWidth;          // reflow so the tween starts from `from`
+                btn.style.width=to+"px";
+                const onEnd=(e)=>{ if(e.target===btn&&e.propertyName==="width"){
+                  btn.style.width=""; btn.removeEventListener("transitionend",onEnd); } };
+                btn.addEventListener("transitionend",onEnd);
+              }
+              // success-check replay: reset, force reflow, play from offset 0
+              chk.setAttribute("data-state","out");
+              void chk.offsetWidth;
+              chk.setAttribute("data-state","in");
+            } else { chk.setAttribute("data-state","in"); }
+          }
+        } else { lastW.current=btn.getBoundingClientRect().width; }
+        prev.current=applied;
+      });
+      if(applied) return h("button",{ref,className:"tl-pill-btn tl-apply-btn is-applied",disabled:true},
+        h("span",{className:"tl-sug-check","data-state":"out","aria-hidden":"true"},
+          h("svg",{width:13,height:13,viewBox:"0 0 16 16",fill:"none",
+            xmlns:"http://www.w3.org/2000/svg",style:{display:"block"}},
+            h("path",{d:"M4 8.4268L6.46155 11.19223L12 4.97001",stroke:"currentColor",
+              strokeWidth:1.5,strokeLinecap:"round",strokeLinejoin:"round"}))),
+        "Applied");
+      return h("button",{ref,className:"tl-pill-btn tl-apply-btn",onClick:onApply},"Apply");
+    }
+    function RefineResults({suggestions,appliedIds,onApply,lanes}){
       const ref=useRef(null);
       useEffect(()=>{
         const el=ref.current;if(!el)return;
@@ -1535,27 +1796,45 @@
         el.classList.add("is-shown");
       },[]);
       const delay=(i)=>({transitionDelay:"calc(var(--stagger-stagger) * "+i+")"});
+      // category chip label + color modifier, keyed by the suggestion kind
+      const CAT={easing:["Easing","is-easing"],duration:["Duration","is-duration"],
+        delay:["Delay","is-delay"],scale:["Scale","is-scale"],distance:["Distance","is-distance"],
+        replace:["Transition replacement","is-replace"]};
+      const cap=(p)=>p&&p!=="all"?p.charAt(0).toUpperCase()+p.slice(1):"";
       let i=0;
       return h("div",{ref,className:"tl-refine-results t-stagger"},
-        summary&&h("div",{className:"tl-refine-summary t-stagger-line",style:delay(i++)},summary),
         suggestions.map(s=>{
           const applied=!!appliedIds[s.id];
+          const isReplace=s.kind==="replace";
+          const member=resolveSugMember(s,lanes);
+          const prop=cap(s.property);
+          const cat=CAT[s.kind]||CAT.easing;
+          const applyBtn=h(ApplyBtn,{applied,onApply:()=>onApply(s)});
           return h("div",{className:"tl-sug t-stagger-line",key:s.id,style:delay(i++)},
-            h("div",{className:"tl-sug-top"},
-              h("span",{className:"tl-sug-kind"},s.kind||"tweak"),
-              s.property&&h("span",{className:"tl-sug-prop"},s.property)),
-            h("div",{className:"tl-sug-title"},s.title),
-            h("div",{className:"tl-sug-delta"},
-              s.from&&h("span",{className:"tl-sug-from"},s.from),
-              s.from&&h("span",{className:"tl-sug-arrow"},"\u2192"),
-              h("span",{className:"tl-sug-to"},s.to)),
-            s.reason&&h("div",{className:"tl-sug-reason"},s.reason),
-            applied
-              ? h("button",{className:"tl-sug-apply is-applied",disabled:true},h(Ic,{name:"check",size:13}),"Applied")
-              : h("button",{className:"tl-sug-apply",onClick:()=>onApply(s)},"Apply"));
+            // top row: member chip + property, or a single heading for replace cards
+            h("div",{className:"tl-sug-head"},
+              isReplace
+                ? h("span",{className:"tl-sug-prop"},s.title||"Transition replacement")
+                : h(React.Fragment,null,
+                    member&&h("span",{className:"tl-sug-member"},member),
+                    prop&&h("span",{className:"tl-sug-prop"},prop))),
+            h("div",{className:"tl-sug-divider"}),
+            h("span",{className:cx("tl-sug-cat",cat[1])},cat[0]),
+            h("div",{className:"tl-sug-body"},
+              h("div",{className:"tl-sug-text"},
+                isReplace
+                  ? h("div",{className:"tl-sug-title"},
+                      "Current transition",h("br"),"\u2192 "+(s.title||"transition")+" from transitions.dev")
+                  : h(React.Fragment,null,
+                      s.title&&h("div",{className:"tl-sug-title"},s.title),
+                      (s.from||s.to)&&h("div",{className:"tl-sug-delta"},
+                        s.from&&h("span",{className:"tl-sug-from"},s.from),
+                        s.to&&h("span",{className:"tl-sug-to"},s.to))),
+                s.reason&&h("div",{className:"tl-sug-reason"},s.reason)),
+              applyBtn));
         }));
     }
-    function RefinePanel({open,onClose,phase,label,refineType,onType,suggestions,summary,error,appliedIds,onApply,onApplyAll,mode,onMode,llmAvailable,cliInstalled,onStart}){
+    function RefinePanel({open,onClose,phase,label,refineType,onType,suggestions,summary,error,appliedIds,onApply,onApplyAll,mode,onMode,llmAvailable,cliInstalled,onStart,lanes}){
       // mount-on-open; keep mounted through the panel-reveal slide-out, then unmount
       const[render,setRender]=useState(open);
       const[panelOpen,setPanelOpen]=useState(false);
@@ -1605,6 +1884,12 @@
       const agentReady = !agentMode || llmAvailable!==false;
       const typeDesc = (REFINE_TYPES.find(t=>t.key===refineType)||REFINE_TYPES[0]).desc;
       const modeLabel = (REFINE_MODES.find(m=>m.key===mode)||REFINE_MODES[0]).label;
+      // Idle empty-state copy is mode-aware: Agent (llm) keeps the type's
+      // agent-oriented desc; Deterministic has no agent, so it describes the
+      // math-snap behavior (and that "replace" needs Agent mode).
+      const idleDesc = agentMode ? typeDesc : (refineType==="replace"
+        ? "Deterministic mode can't pick a recipe to replace the transition — switch to Agent mode for replacements."
+        : "Deterministic mode snaps your transition's timing to the nearest Transitions.dev motion tokens — mathematically, with no agent or credits.");
       // One persistent control for the whole foot: in idle/done/error it's the
       // pill button; while scanning it carries `.is-scanning` and the same DOM
       // node morphs (card resize) into the loading rectangle with the border-beam.
@@ -1615,17 +1900,17 @@
         return h("button",{className:cx("tl-scan-morph","t-resize",scanning&&"is-scanning"),
           disabled:(!!o.disabled)||scanning,"aria-busy":scanning?"true":undefined,
           onClick:(o.disabled||scanning)?undefined:onStart},
-          scanning&&h(BorderBeam,{size:"md",colorVariant:"ocean",theme:"light",borderRadius:10,duration:2.6,saturation:2,brightness:1.6,className:"tl-scan-beam"},
+          scanning&&h(BorderBeam,{size:"md",colorVariant:"ocean",theme:"light",duration:2.6,saturation:2,brightness:1.6,className:"tl-scan-beam"},
             h("span",{className:"tl-scan-beam-fill"})),
           h("span",{className:"tl-scan-content"},
             h("span",{className:"tl-scan-face tl-scan-face-label","aria-hidden":scanning?"true":undefined},
               h("span",{className:"tl-scan-label"},o.label||"Start scanning")),
             h("span",{className:"tl-scan-face tl-scan-face-status","aria-hidden":scanning?undefined:"true"},
-              h("span",{className:"tl-scan-ic","aria-hidden":"true"},h(Ic,{name:"scan",size:15})),
+              h(DotmLoader),
               h(ShimmerSwapText,{text:REFINE_STATUS[statusIx]}))));
       };
 
-      let body, foot;
+      let body, foot, footBar=false;
       if(phase==="scanning"){
         body = h("div",{className:"tl-refine-center"});
         foot = startBtn();
@@ -1643,10 +1928,13 @@
             h("p",{className:"tl-refine-idle-text"},emptyMsg));
           foot = startBtn({label:"Scan again"});
         } else {
-          body = h(RefineResults,{summary:refineType==="replace"?null:summary,suggestions:visible,appliedIds,onApply});
-          foot = pending.length>1
-            ? h("button",{className:"pc-btn primary",style:{flex:1},onClick:()=>pending.forEach(onApply)},"Apply all ("+pending.length+")")
-            : startBtn({label:"Scan again"});
+          body = h(RefineResults,{suggestions:visible,appliedIds,onApply,lanes:lanes||[]});
+          footBar = true;
+          foot = h(React.Fragment,null,
+            h("button",{className:"tl-pill-btn",disabled:pending.length===0,
+              onClick:()=>pending.forEach(onApply)},
+              h("span",null,"Apply all ",h("span",{className:"tl-dim"},"("+pending.length+")"))),
+            h("button",{className:"tl-pill-btn",onClick:onStart},"Scan again"));
         }
       } else { // idle
         if(!agentReady){
@@ -1659,7 +1947,7 @@
           foot = startBtn({disabled:true});
         } else {
           body = h("div",{className:"tl-refine-center"},
-            h("p",{className:"tl-refine-idle-text"},typeDesc));
+            h("p",{className:"tl-refine-idle-text"},idleDesc));
           foot = startBtn({});
         }
       }
@@ -1684,13 +1972,13 @@
               h("div",{className:"tl-mode-row-main"},
                 h("div",{className:"tl-mode-row-title"},m.label),
                 h("div",{className:"tl-mode-row-desc"},m.desc)),
-              (mode===m.key)&&h("span",{className:"tl-mode-row-check"},h(Ic,{name:"check",size:16}))))),
+              (mode===m.key)&&h("span",{className:"tl-mode-row-check"},h(Ic,{name:"accept",size:16}))))),
           h("div",{className:"tl-refine-tabs",role:"tablist","aria-label":"Refinement type"},
             REFINE_TYPES.map(t=>h("button",{key:t.key,className:"tl-refine-tab",role:"tab",
               "aria-selected":refineType===t.key?"true":"false",
               onClick:()=>{if(t.key!==refineType)onType(t.key);}},t.label))),
           h("div",{className:"tl-refine-body"},body),
-          h("div",{className:"tl-refine-foot"},foot)));
+          h("div",{className:cx("tl-refine-foot",footBar&&"is-bar")},foot)));
     }
 
     // Diff the active item's effective (edited/refined) lanes against their
@@ -1736,10 +2024,10 @@
       const fFlat=flatItems.filter(e=>!ql||(e.label||"").toLowerCase().includes(ql));
       const noMatches=!!ql&&fGroups.length===0&&fFlat.length===0;
       const phaseItem=(e)=>h(MenuItem,{key:e.id,active:active&&e.id===active.id,onClick:()=>{onSelect(e.id);setPick(false);},
-        right:active&&e.id===active.id&&h("span",{className:"tl-menu-check"},h(Ic,{name:"check"}))},
+        right:active&&e.id===active.id&&h("span",{className:"tl-menu-check"},h(Ic,{name:"accept"}))},
         h("span",null,e.phaseLabel,h("span",{className:"tl-menu-dim"}," "+e.durationMs+"ms")));
       const flatItem=(e)=>h(MenuItem,{key:e.id,active:active&&e.id===active.id,onClick:()=>{onSelect(e.id);setPick(false);},
-        right:active&&e.id===active.id&&h("span",{className:"tl-menu-check"},h(Ic,{name:"check"}))},
+        right:active&&e.id===active.id&&h("span",{className:"tl-menu-check"},h(Ic,{name:"accept"}))},
         h("span",null,e.label,h("span",{className:"tl-menu-dim"}," "+e.durationMs+"ms")));
       return h("div",{className:"tl-header"},
         h("span",{className:"tl-header-label"},"Selected"),
@@ -1763,14 +2051,24 @@
                   fFlat.length>0&&fGroups.length>0&&h("div",{className:"tl-menu-section"},"Ungrouped"),
                   ...fFlat.map(flatItem))),
         h("span",{className:"tl-header-count"},
-          scanning?"Scanning transitions…":entries.length+" transition"+(entries.length===1?"":"s")+" found"),
+          scanning
+            ? h("span",{className:"tl-scanning-row"},h(DotmLoader),h("span",null,"Scanning transitions…"))
+            : entries.length+" transition"+(entries.length===1?"":"s")+" found"),
         h("button",{ref:gearRef,className:cx("tl-icon-btn",setg&&"is-active"),title:"Settings",onClick:()=>setSetg(v=>!v)},h(Ic,{name:"dotsv"})),
         h(Dropdown,{open:setg,onClose:()=>setSetg(false),triggerRef:gearRef,width:210,align:"right"},
-          h(MenuItem,{onClick:()=>setSnap(v=>!v),right:snap&&h("span",{className:"tl-menu-check"},h(Ic,{name:"check"}))},"Snap to grid"),
+          h("div",{className:"tl-menu-head"},
+            h("span",null,"Transitions.dev ",h("span",{className:"tl-menu-head-name"},"Refine")),
+            h("span",{className:"tl-menu-head-ver"},REFINE_VERSION)),
+          h("div",{className:"tl-menu-divider"}),
           h(MenuItem,{disabled:!active,onClick:()=>{onCopy&&onCopy();setSetg(false);},
-            right:copied&&h("span",{className:"tl-menu-check"},h(Ic,{name:"check"}))},copied?"Copied":"Copy values"),
-          h(MenuItem,{disabled:scanning,onClick:()=>{setSetg(false);onRescan&&onRescan();}},
-            scanning?"Rescanning…":"Rescan transitions")),
+            left:h("span",{className:"tl-menu-icon"},h(Ic,{name:"copy"})),
+            right:copied&&h("span",{className:"tl-menu-check"},h(Ic,{name:"accept"}))},copied?"Copied":"Copy values"),
+          h(MenuItem,{disabled:scanning,onClick:()=>{setSetg(false);onRescan&&onRescan();},
+            left:h("span",{className:"tl-menu-icon"},h(Ic,{name:"restart"}))},
+            scanning?"Rescanning…":"Rescan transitions"),
+          h("div",{className:"tl-menu-divider"}),
+          h(MenuItem,{onClick:()=>{setSetg(false);window.open("https://transitions.dev","_blank","noopener");},
+            right:h("span",{className:"tl-menu-chevr"},h(Ic,{name:"chevronr",size:16}))},"Learn more")),
         h("span",{className:"t-tt-wrap"},
           h("button",{className:"tl-sec-btn t-tt-trigger",disabled:!active,onClick:onReset},"Reset"),
           h("span",{className:"t-tt tl-tt-below",role:"tooltip"},"Reset values")),
@@ -1779,9 +2077,9 @@
             disabled:!active||acceptDisabled||acceptState==="saving"||acceptState==="done",onClick:onAccept,"aria-label":"Accept changes to your code"},
             acceptState==="saving"
               ? h("span",{className:"tl-accept-spin","aria-hidden":"true"})
-              : h(Ic,{name:"check"}),
+              : h(Ic,{name:"accept"}),
             h("span",null,acceptState==="done"?"Done":"Accept")),
-          h("span",{className:"t-tt tl-tt-below",role:"tooltip"},
+          h("span",{className:cx("t-tt","tl-tt-below",acceptState==="error"&&acceptError&&"tl-tt-msg"),role:"tooltip"},
             acceptState==="error"&&acceptError?acceptError
               :acceptState==="done"?"Saved to your code"
               :acceptDisabled?"No changes to save"
@@ -1910,7 +2208,7 @@
         !readOnly&&h(Dropdown,{open:menu,onClose:()=>setMenu(false),triggerRef:chevRef,
           width:(wrapRef.current&&wrapRef.current.offsetWidth)||220,align:"right"},
           (tokens||[]).map(tk=>h(MenuItem,{key:tk.label,active:value===tk.ms,onClick:()=>{onChange(tk.ms);setMenu(false);},
-            right:value===tk.ms&&h("span",{className:"tl-menu-check"},h(Ic,{name:"check"}))},
+            right:value===tk.ms&&h("span",{className:"tl-menu-check"},h(Ic,{name:"accept"}))},
             h("span",{className:"tl-menu-text"},tk.label,h("span",{className:"tl-menu-dim"}," "+tk.ms+"ms")))) ),
         readOnly&&readOnlyHint&&h("span",{className:"t-tt",role:"tooltip"},readOnlyHint),
       );
@@ -1923,6 +2221,131 @@
     // equal headroom above/below so overshoot/undershoot handles (clamped to the
     // -0.5..1.5 range) stay visible instead of being clipped at the edges.
     const CURVE = { VBW:269, VBH:150, PAD_X:30, PAD_Y:42 };
+
+    // Unified "Preview" section (Figma node 580:11158) — collapsible, collapsed by
+    // default (transitions.dev · 21-accordion). Holds BOTH the timing curve card
+    // (cubic w/ draggable handles, or the spring curve) AND the animated position
+    // preview: a big blue marker travels along a dashed rail using the live timing
+    // function + duration, pauses, returns, and loops.
+    function Preview({easing, cubic, spring, durationMs, apply}){
+      const trackRef = useRef(null);
+      const dotRef = useRef(null);
+      const svgRef = useRef(null);
+      const [playing, setPlaying] = useState(false);
+      const [open, setOpen] = useState(false);
+      const safeEasing = (!easing || easing.trim()==="") ? "linear" : easing;
+      const dur = Math.max(120, durationMs || 0);
+
+      const { VBW, VBH, PAD_X, PAD_Y } = CURVE;
+      const plotW = VBW - 2*PAD_X, plotH = VBH - 2*PAD_Y;
+      const originX = PAD_X, originY = VBH - PAD_Y, endX = VBW - PAD_X, endY = PAD_Y;
+      const fx = f => PAD_X + f*plotW;
+      const fy = v => (VBH - PAD_Y) - v*plotH;
+      const cb = cubic || [0.25,0.1,0.25,1];
+      const setEasing = useCallback(v=>apply({easing:v, spring:null}),[apply]);
+
+      const startHandleDrag = useCallback((pointIdx, e)=>{
+        e.preventDefault(); e.stopPropagation();
+        const svg = svgRef.current; if(!svg) return;
+        const calc = (clientX, clientY) => {
+          const rect = svg.getBoundingClientRect();
+          const vbx = (clientX - rect.left) / rect.width * VBW;
+          const vby = (clientY - rect.top) / rect.height * VBH;
+          let x = (vbx - PAD_X) / plotW;
+          let y = ((VBH - PAD_Y) - vby) / plotH;
+          x = Math.round(Math.max(0, Math.min(1, x)) * 100) / 100;
+          y = Math.round(Math.max(-0.5, Math.min(1.5, y)) * 100) / 100;
+          const next = [...cb];
+          next[pointIdx*2] = x; next[pointIdx*2+1] = y;
+          setEasing(`cubic-bezier(${next.join(", ")})`);
+        };
+        const onMove = e2 => calc(e2.clientX, e2.clientY);
+        const onUp = () => { window.removeEventListener("mousemove",onMove); window.removeEventListener("mouseup",onUp); };
+        window.addEventListener("mousemove",onMove);
+        window.addEventListener("mouseup",onUp);
+      },[cb,setEasing,plotW,plotH,VBW,VBH,PAD_X,PAD_Y]);
+
+      // spring curve (read-only) — auto-fit so overshoot above 1 stays in frame
+      const springCurve = useMemo(()=>{
+        if(!spring) return null;
+        const sim = simulateSpring(spring.stiffness, spring.damping, spring.mass ?? 1);
+        const vals = sim.values;
+        const hi = Math.max(1, ...vals), lo = Math.min(0, ...vals);
+        const range = (hi - lo) || 1;
+        const sx = i => PAD_X + (i/(vals.length-1))*plotW;
+        const sy = v => (VBH - PAD_Y) - ((v - lo)/range)*plotH;
+        return { d: vals.map((v,i)=>`${i===0?"M":"L"} ${sx(i).toFixed(2)} ${sy(v).toFixed(2)}`).join(" "),
+                 yOne: sy(1), yZero: sy(0) };
+      },[spring,plotW,plotH,VBW,VBH,PAD_X,PAD_Y]);
+
+      useEffect(()=>{
+        if(!playing || !open) return;
+        const dot = dotRef.current, track = trackRef.current;
+        if(!dot || !track) return;
+        let cancelled = false, anim = null, timer = null, atRight = false;
+        const GAP = 480, DOT = 28;
+        const travel = ()=> Math.max(0, track.clientWidth - DOT);
+        const step = ()=>{
+          if(cancelled) return;
+          const from = atRight ? travel() : 0;
+          const to   = atRight ? 0 : travel();
+          try {
+            anim = dot.animate(
+              [{transform:`translateX(${from}px)`},{transform:`translateX(${to}px)`}],
+              {duration:dur, easing:safeEasing, fill:"forwards"});
+          } catch {
+            anim = dot.animate(
+              [{transform:`translateX(${from}px)`},{transform:`translateX(${to}px)`}],
+              {duration:dur, easing:"linear", fill:"forwards"});
+          }
+          anim.onfinish = ()=>{ if(cancelled) return; atRight = !atRight; timer = setTimeout(step, GAP); };
+        };
+        step();
+        return ()=>{ cancelled = true; if(anim){try{anim.cancel();}catch{}} if(timer)clearTimeout(timer); };
+      },[playing, open, safeEasing, dur]);
+
+      const p1x = fx(cb[0]), p1y = fy(cb[1]), p2x = fx(cb[2]), p2y = fy(cb[3]);
+
+      return h("div",{className:"tl-preview","data-open":open?"true":"false"},
+        h("button",{className:"tl-preview-head","aria-expanded":open,onClick:()=>setOpen(o=>!o)},
+          h("span",{className:"tl-preview-title"},"Preview"),
+          h("span",{className:"tl-preview-chevron"},h(Ic,{name:"chevron",size:16})),
+        ),
+        h("div",{className:"tl-preview-panel"},
+          h("div",{className:"tl-preview-panel-inner"},
+            h("div",{className:"tl-preview-body"},
+              h("div",{className:"tl-curve tl-preview-curve"},
+                spring
+                  ? h("svg",{viewBox:`0 0 ${VBW} ${VBH}`},
+                      h("line",{x1:PAD_X,y1:springCurve.yOne,x2:VBW-PAD_X,y2:springCurve.yOne,stroke:"#1A7AFF",strokeWidth:1,strokeDasharray:"3 4",style:{opacity:0.5,pointerEvents:"none"}}),
+                      h("line",{x1:PAD_X,y1:springCurve.yZero,x2:VBW-PAD_X,y2:springCurve.yZero,stroke:"rgba(0,0,0,0.18)",strokeWidth:1,strokeDasharray:"3 4",style:{pointerEvents:"none"}}),
+                      h("path",{d:springCurve.d,fill:"none",stroke:"#181a1e",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"}),
+                    )
+                  : h("svg",{ref:svgRef,viewBox:`0 0 ${VBW} ${VBH}`},
+                      h("path",{d:`M ${originX} ${originY} C ${p1x} ${p1y}, ${p2x} ${p2y}, ${endX} ${endY}`,
+                        fill:"none",stroke:"#181a1e",strokeWidth:2,strokeLinecap:"round"}),
+                      h("line",{x1:p1x,y1:p1y,x2:originX,y2:originY,stroke:"#1A7AFF",strokeWidth:2,strokeLinecap:"round",style:{pointerEvents:"none"}}),
+                      h("line",{x1:p2x,y1:p2y,x2:endX,y2:endY,stroke:"#1A7AFF",strokeWidth:2,strokeLinecap:"round",style:{pointerEvents:"none"}}),
+                      h("circle",{cx:p1x,cy:p1y,r:5.5,fill:"#1A7AFF",style:{pointerEvents:"none",filter:"drop-shadow(0 1px 3px rgba(0,0,0,.25))"}}),
+                      h("circle",{cx:p2x,cy:p2y,r:5.5,fill:"#1A7AFF",style:{pointerEvents:"none",filter:"drop-shadow(0 1px 3px rgba(0,0,0,.25))"}}),
+                      h("circle",{className:"tl-curve-handle",cx:p1x,cy:p1y,r:9,fill:"transparent",onMouseDown:e=>startHandleDrag(0,e)}),
+                      h("circle",{className:"tl-curve-handle",cx:p2x,cy:p2y,r:9,fill:"transparent",onMouseDown:e=>startHandleDrag(1,e)}),
+                    ),
+              ),
+              h("div",{className:"tl-preview-sub"},
+                h("span",{className:"tl-preview-sub-label"},"Position preview"),
+                h("button",{className:"tl-preview-play",onClick:()=>setPlaying(p=>!p)},playing?"Pause":"Play"),
+              ),
+              h("div",{className:"tl-preview-track"},
+                h("div",{className:"tl-preview-rail-wrap",ref:trackRef},
+                  h("span",{className:"tl-preview-rail"}),
+                  h("span",{className:"tl-preview-dot",ref:dotRef})),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     function EasingEditor({easing, cubic, spring, durationMs, propKey, apply}){
       const [tab, setTab] = useState(spring ? "springs" : "easing");
@@ -1966,6 +2389,7 @@
       });
 
       return h("div",{className:"tl-ease"},
+        h("div",{className:"tl-inspector-divider"}),
         h("div",{className:"tl-seg",role:"tablist"},
           h("button",{className:cx("tl-seg-btn",tab==="easing"&&"is-active"),role:"tab",
             "aria-selected":tab==="easing",onClick:()=>selectTab("easing")},"Easing"),
@@ -1978,6 +2402,7 @@
           h("div",{className:"t-page",ref:springPageRef,"data-page-id":"2","aria-hidden":tab!=="springs"},
             h(SpringTab,{spring,applySpring})),
         ),
+        h(Preview,{easing, cubic, spring, durationMs, apply}),
       );
     }
 
@@ -2049,32 +2474,63 @@
             ? h("div",{key:"g"+i,className:"tl-menu-group"},o.group)
             : h(MenuItem,{key:"e"+i,active:selEaseIdx>=0?i===selEaseIdx:(o.value===mode),
                 onClick:()=>pickEase(o.value),
-                right:(i===selEaseIdx)&&h("span",{className:"tl-menu-check"},h(Ic,{name:"check"}))},
+                right:(i===selEaseIdx)&&h("span",{className:"tl-menu-check"},h(Ic,{name:"accept"}))},
                 h("span",{className:"tl-menu-text"},o.label)))),
         h("div",{className:"tl-cubic-row"},
-          ...[0,1,2,3].map(i=>h("input",{key:i,type:"number",step:0.05,min:i%2===0?0:undefined,max:i%2===0?1:undefined,
-            value:cb[i],onChange:e=>setCubicVal(i,e.target.value)})),
+          ...[0,1,2,3].map(i=>h("div",{key:i,className:"tl-cubic-cell"},
+            h("input",{type:"number",step:0.05,min:i%2===0?0:undefined,max:i%2===0?1:undefined,
+              value:cb[i],onChange:e=>setCubicVal(i,e.target.value)}))),
         ),
         mode==="__custom" && h("input",{className:"tl-custom-input",value:easing,
           placeholder:"e.g. steps(4, end)",
           onChange:e=>setEasing(e.target.value)}),
-        h("div",{className:"tl-curve"},
-          h("svg",{ref:svgRef,viewBox:`0 0 ${VBW} ${VBH}`},
-            h("defs",null,
-              h("pattern",{id:"tl-curve-dots",width:14,height:14,patternUnits:"userSpaceOnUse",patternTransform:"translate(7 7)"},
-                h("circle",{cx:0,cy:0,r:1,fill:"rgba(0,0,0,0.10)"}))),
-            h("rect",{x:0,y:0,width:VBW,height:VBH,fill:"url(#tl-curve-dots)",style:{pointerEvents:"none"}}),
-            h("path",{d:`M ${originX} ${originY} C ${p1x} ${p1y}, ${p2x} ${p2y}, ${endX} ${endY}`,
-              fill:"none",stroke:"#181a1e",strokeWidth:2,strokeLinecap:"round"}),
-            h("line",{x1:p1x,y1:p1y,x2:originX,y2:originY,stroke:"#1A7AFF",strokeWidth:2,strokeLinecap:"round",style:{pointerEvents:"none"}}),
-            h("line",{x1:p2x,y1:p2y,x2:endX,y2:endY,stroke:"#1A7AFF",strokeWidth:2,strokeLinecap:"round",style:{pointerEvents:"none"}}),
-            h("circle",{cx:p1x,cy:p1y,r:5.5,fill:"#1A7AFF",style:{pointerEvents:"none",filter:"drop-shadow(0 1px 3px rgba(0,0,0,.25))"}}),
-            h("circle",{cx:p2x,cy:p2y,r:5.5,fill:"#1A7AFF",style:{pointerEvents:"none",filter:"drop-shadow(0 1px 3px rgba(0,0,0,.25))"}}),
-            h("circle",{className:"tl-curve-handle",cx:p1x,cy:p1y,r:9,fill:"transparent",
-              onMouseDown:e=>startHandleDrag(0,e)}),
-            h("circle",{className:"tl-curve-handle",cx:p2x,cy:p2y,r:9,fill:"transparent",
-              onMouseDown:e=>startHandleDrag(1,e)}),
-          ),
+      );
+    }
+
+    // Spring physics scrubber — reuses the exact Figma "Value slider and input"
+    // (.tl-field) component used by Duration/Delay, minus the chevron stepper.
+    // Supports fractional values (Mass) via `decimals`.
+    function SpringField({label, value, min, max, step, decimals, onChange}){
+      const trackRef = useRef(null);
+      const inputRef = useRef(null);
+      const [editing,setEditing]=useState(false);
+      const [draft,setDraft]=useState("");
+      const [dragging,setDragging]=useState(false);
+      const pct = Math.min(Math.max((value - min) / (max - min), 0), 1) * 100;
+      const fmt = v => decimals ? Number(v).toFixed(decimals) : String(Math.round(v));
+      const clampSnap = raw => {
+        const snapped = Math.round(raw / step) * step;
+        const c = Math.max(min, Math.min(max, snapped));
+        const p = Math.pow(10, decimals || 0);
+        return Math.round(c * p) / p;
+      };
+      const setFromX = useCallback(clientX => {
+        if(!trackRef.current) return;
+        const rect = trackRef.current.getBoundingClientRect();
+        const ratio = Math.max(0, Math.min((clientX - rect.left) / rect.width, 1));
+        onChange(clampSnap(min + ratio * (max - min)));
+      },[min,max,step,decimals,onChange]);
+      const startDrag = useCallback(e=>{
+        if(editing) return;
+        e.preventDefault(); setDragging(true); setFromX(e.clientX);
+        const onMove = e2 => setFromX(e2.clientX);
+        const onUp = () => { setDragging(false); window.removeEventListener("mousemove",onMove); window.removeEventListener("mouseup",onUp); };
+        window.addEventListener("mousemove",onMove); window.addEventListener("mouseup",onUp);
+      },[setFromX,editing]);
+      const selectAll = useCallback(e=>{ const el=e&&e.target?e.target:inputRef.current; if(!el)return; requestAnimationFrame(()=>el.select()); },[]);
+      const beginEdit = useCallback(e=>{ e.stopPropagation(); setDraft(fmt(value)); setEditing(true); },[value,decimals]);
+      const commit = useCallback(()=>{ const n=parseFloat(draft); if(!isNaN(n)) onChange(clampSnap(n)); setEditing(false); },[draft,min,max,step,decimals,onChange]);
+      return h("div",{className:cx("tl-field-wrap","tl-spring-field")},
+        h("div",{className:cx("tl-field",dragging&&"is-dragging",editing&&"is-editing")},
+          h("div",{className:"tl-field-fill",style:{width:pct+"%"}},
+            h("div",{className:"tl-field-thumb"})),
+          h("div",{ref:trackRef,className:"tl-field-track",onMouseDown:startDrag}),
+          h("span",{className:"tl-field-label"},label),
+          editing
+            ? h("input",{ref:inputRef,className:"tl-field-input",autoFocus:true,value:draft,
+                onChange:e=>setDraft(e.target.value),onBlur:commit,onFocus:selectAll,
+                onKeyDown:e=>{if(e.key==="Enter")commit();if(e.key==="Escape")setEditing(false);}})
+            : h("span",{className:"tl-field-value",onMouseDown:e=>e.stopPropagation(),onClick:beginEdit},fmt(value)),
         ),
       );
     }
@@ -2095,17 +2551,6 @@
         applySpring(next.stiffness, next.damping, next.mass, matchSpringPreset(next));
       },[stiffness,damping,mass,applySpring]);
 
-      // spring curve — auto-fit vertically so overshoot above 1 stays in frame.
-      const { VBW, VBH, PAD_X, PAD_Y } = CURVE;
-      const plotW = VBW - 2*PAD_X, plotH = VBH - 2*PAD_Y;
-      const vals = sim.values;
-      const hi = Math.max(1, ...vals), lo = Math.min(0, ...vals);
-      const range = (hi - lo) || 1;
-      const sx = i => PAD_X + (i/(vals.length-1))*plotW;
-      const sy = v => (VBH - PAD_Y) - ((v - lo)/range)*plotH;
-      const yOne = sy(1), yZero = sy(0);
-      const curveD = vals.map((v,i)=>`${i===0?"M":"L"} ${sx(i).toFixed(2)} ${sy(v).toFixed(2)}`).join(" ");
-
       return h(React.Fragment,null,
         h("button",{ref:spRef,className:cx("tl-select",spOpen&&"is-open"),onClick:()=>setSpOpen(v=>!v)},
           h("span",{className:"tl-select-label"},presetName==="Custom"?"Custom spring":presetName),
@@ -2114,47 +2559,19 @@
           width:Math.max(248,(spRef.current&&spRef.current.offsetWidth)||248),align:"left"},
           SPRING_PRESETS.map(p=>h(MenuItem,{key:p.label,active:p.label===presetName,
             onClick:()=>{applySpring(p.stiffness,p.damping,p.mass,p.label);setSpOpen(false);},
-            right:p.label===presetName&&h("span",{className:"tl-menu-check"},h(Ic,{name:"check"}))},
+            right:p.label===presetName&&h("span",{className:"tl-menu-check"},h(Ic,{name:"accept"}))},
             h("span",{className:"tl-menu-text"},p.label)))),
-        h("div",{className:"tl-bounce"},
-          h("div",{className:"tl-bounce-title"},"Spring physics"),
-          h("div",{className:"tl-bounce-row"},
-            h("label",null,"Stiffness"),
-            h("input",{type:"range",min:20,max:400,step:5,value:stiffness,
-              onChange:e=>setParam("stiffness",parseFloat(e.target.value))}),
-            h("span",{className:"tl-bounce-val"},Math.round(stiffness)),
-          ),
-          h("div",{className:"tl-bounce-row"},
-            h("label",null,"Damping"),
-            h("input",{type:"range",min:1,max:120,step:1,value:damping,
-              onChange:e=>setParam("damping",parseFloat(e.target.value))}),
-            h("span",{className:"tl-bounce-val"},Math.round(damping)),
-          ),
-          h("div",{className:"tl-bounce-row"},
-            h("label",null,"Mass"),
-            h("input",{type:"range",min:0.2,max:5,step:0.1,value:mass,
-              onChange:e=>setParam("mass",parseFloat(e.target.value))}),
-            h("span",{className:"tl-bounce-val"},mass.toFixed(1)),
-          ),
-          h("div",{className:"tl-spring-dur"},
-            h("span",null,"Duration"),
-            h("b",null,"~"+sim.durationMs+"ms"),
-            h("span",{className:"tl-spring-dur-hint"},"· derived"+(overshoots?" · overshoots":"")),
-          ),
+        h("div",{className:"tl-spring-fields"},
+          h(SpringField,{label:"Stiffness",value:stiffness,min:20,max:400,step:5,
+            onChange:v=>setParam("stiffness",v)}),
+          h(SpringField,{label:"Damping",value:damping,min:1,max:120,step:1,
+            onChange:v=>setParam("damping",v)}),
+          h(SpringField,{label:"Mass",value:mass,min:0.2,max:5,step:0.1,decimals:1,
+            onChange:v=>setParam("mass",v)}),
         ),
-        h("div",{className:"tl-curve"},
-          h("svg",{viewBox:`0 0 ${VBW} ${VBH}`},
-            h("defs",null,
-              h("pattern",{id:"tl-spring-dots",width:14,height:14,patternUnits:"userSpaceOnUse",patternTransform:"translate(7 7)"},
-                h("circle",{cx:0,cy:0,r:1,fill:"rgba(0,0,0,0.10)"}))),
-            h("rect",{x:0,y:0,width:VBW,height:VBH,fill:"url(#tl-spring-dots)",style:{pointerEvents:"none"}}),
-            // target (value = 1) and baseline (value = 0) reference lines
-            h("line",{x1:PAD_X,y1:yOne,x2:VBW-PAD_X,y2:yOne,stroke:"#1A7AFF",strokeWidth:1,
-              strokeDasharray:"3 4",style:{opacity:0.5,pointerEvents:"none"}}),
-            h("line",{x1:PAD_X,y1:yZero,x2:VBW-PAD_X,y2:yZero,stroke:"rgba(0,0,0,0.18)",strokeWidth:1,
-              strokeDasharray:"3 4",style:{pointerEvents:"none"}}),
-            h("path",{d:curveD,fill:"none",stroke:"#181a1e",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"}),
-          ),
+        h("div",{className:"tl-spring-dur"},
+          "Duration ", h("b",null,sim.durationMs+"ms"), " Derived",
+          overshoots&&h("span",{className:"tl-spring-dur-hint"}," · overshoots"),
         ),
       );
     }
@@ -2268,6 +2685,22 @@
       const{setPropOverride}=usePropOverride();
       const{registry}=useContext(TimelineCtx);
       const[copied,setCopied]=useState(false);
+      // tiny transient toast (e.g. "Values copied"); {msg,id,closing,loader}
+      // loader toasts (e.g. "Agent accepting changes") are sticky — they stay up
+      // with a dot-matrix loader until dismissed by the caller, no auto-hide.
+      const[toast,setToast]=useState(null);
+      const showToast=useCallback((msg,opts)=>{setToast({msg,id:Date.now(),closing:false,loader:!!(opts&&opts.loader)});},[]);
+      const dismissToast=useCallback(()=>{setToast(t=>t&&!t.closing?{...t,closing:true}:t);},[]);
+      useEffect(()=>{
+        if(!toast||toast.closing||toast.loader)return;
+        const hide=setTimeout(()=>setToast(t=>t&&t.id===toast.id?{...t,closing:true}:t),1800);
+        return()=>clearTimeout(hide);
+      },[toast&&toast.id,toast&&toast.closing,toast&&toast.loader]);
+      useEffect(()=>{
+        if(!toast||!toast.closing)return;
+        const kill=setTimeout(()=>setToast(t=>t&&t.id===toast.id?null:t),360);
+        return()=>clearTimeout(kill);
+      },[toast&&toast.id,toast&&toast.closing]);
       const[minimized,setMinimized]=useState(false);
       const[panelHeight,setPanelHeight]=useState(440);
       const[resizing,setResizing]=useState(false);
@@ -2298,6 +2731,17 @@
           setCliInstalled(j.cliInstalled==null?null:!!j.cliInstalled);return j;}
         catch{setLlmAvailable(false);setCliInstalled(false);return null;}
       },[]);
+      // a live agent = the relay reports an agent it can drive (REFINE_AGENT_CMD
+      // wired OR a `/refine live` loop polling). Until then the panel is gated.
+      const live = llmAvailable===true;
+      // poll /health continuously so the panel reacts when `/refine live` is run
+      // (gate → scanning) or when the agent disconnects (re-gate). 2s cadence.
+      useEffect(()=>{
+        let alive=true;
+        refreshHealth();
+        const id=setInterval(()=>{if(alive)refreshHealth();},2000);
+        return()=>{alive=false;clearInterval(id);};
+      },[refreshHealth]);
       // the Refine button toggles the panel; opening drops into the idle state
       // (description + Start scanning) rather than auto-scanning.
       const openRefine=useCallback(()=>{
@@ -2320,7 +2764,7 @@
         if(mode!==refineMode)setRefineMode(mode);
         try{
           const et=active.effectiveTimings||[];
-          const timings=et.map(t=>({property:t.property,durationMs:t.durationMs,delayMs:t.delayMs,easing:t.easing}));
+          const timings=et.map(t=>({property:t.property,member:t.member||null,durationMs:t.durationMs,delayMs:t.delayMs,easing:t.easing}));
           const selector=(active.bindings&&active.bindings.selector)||(et[0]&&et[0].selector)||null;
           // always scan for BOTH kinds (token tweaks + a whole-transition replacement)
           // in one pass; the tabs just filter which kind they show.
@@ -2452,8 +2896,9 @@
         }else{
           text="transition: "+et.map(decl).join(",\n       ")+";";
         }
-        navigator.clipboard.writeText(text).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),1500);});
-      },[active]);
+        navigator.clipboard.writeText(text).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),1500);}).catch(()=>{});
+        showToast("Values copied");
+      },[active,showToast]);
       const resetOverrides=useCallback(()=>{if(active)registry.clearOverride(active.id);},[registry,active]);
       // Accept → send an "apply" job so the agent writes the edited timings into
       // the user's source, then reflect saving / done / error on the button.
@@ -2486,6 +2931,15 @@
       },[active]);
       // reset Accept feedback when switching transitions
       useEffect(()=>{setAcceptState("idle");setAcceptError(null);},[active&&active.id]);
+      // while the agent is applying changes, surface the sticky loader toast
+      // ("Agent accepting changes"); dismiss only when leaving saving (not on
+      // every idle tick — that would kill unrelated toasts like "Values copied").
+      const prevAcceptRef=useRef(acceptState);
+      useEffect(()=>{
+        if(acceptState==="saving"){showToast("Agent accepting changes",{loader:true});}
+        else if(prevAcceptRef.current==="saving"){dismissToast();}
+        prevAcceptRef.current=acceptState;
+      },[acceptState,showToast,dismissToast]);
       // The grouped scan asks the agent to read the source and return Open/Close
       // phases — an expensive LLM round-trip. So it runs ONLY:
       //   1. the first time this page is ever opened (nothing cached), or
@@ -2558,16 +3012,18 @@
         registry.clearGroups();
         runGroupScan();
       },[runGroupScan,GROUP_STORE_KEY,registry]);
-      // On mount, run the group resolver once. It waits for the flat scan to
-      // settle, then either re-applies cached groups (when the content signature
-      // matches — a pure cache read, no agent) or kicks off a fresh agent scan
-      // (first open OR the page's transitions changed since last cache).
+      // Gate the auto group-scan behind a live agent: the panel stays on the
+      // "Before we start" screen until `/refine live` (or a wired REFINE_AGENT_CMD)
+      // makes the relay report an agent. The first time we see a live agent we run
+      // the resolver once — it settles the flat scan, then re-applies cached groups
+      // (signature match, no agent) or kicks off a fresh agent scan. Rescan is
+      // manual after that.
       useEffect(()=>{
-        if(didGroupScanRef.current)return;
+        if(!live||didGroupScanRef.current)return;
         didGroupScanRef.current=true;
         runGroupScan();
-        return ()=>{scanTokenRef.current++;};
-      },[runGroupScan]);
+      },[live,runGroupScan]);
+      useEffect(()=>()=>{scanTokenRef.current++;},[]);
 
       // whole-component open/close uses the transitions.dev panel reveal:
       // keep the panel mounted while it animates, flip data-open on the next
@@ -2609,23 +3065,58 @@
         return()=>window.removeEventListener("tl-toggle-panel",onToggle);
       },[]);
 
+      // gate: the panel is unusable until a live agent is connected AND it has
+      // scanned the page's transitions.
+      //   loading  → first /health probe pending (blank, avoids a text flash)
+      //   blocked  → no live agent → "Before we start" (run /refine live)
+      //   scanning → live agent, scan in flight → "Agent is scanning…"
+      //   ready    → live + scan done → the real timeline UI
+      const gate = !live
+        ? (llmAvailable===null ? "loading" : "blocked")
+        : (groupScanState==="done" ? "ready" : "scanning");
       return h(React.Fragment,null,
         render&&h("div",{className:"t-panel-slide","data-timeline-panel":true,
             "data-open":panelOpen?"true":"false","data-phase":phase,style:{height:panelHeight+"px"}},
           h("div",{className:cx("tl-resize-handle",resizing&&"dragging"),onMouseDown:startResize,title:"Drag to resize"}),
           h("div",{className:"tl-panel-body"},
-            h("div",{className:"tl-panel-main"},
-              h(Header,{entries,active,onSelect:setActiveId,onReset:resetOverrides,onCopy:copyValues,copied,
-                snap,setSnap,onMinimize:()=>setMinimized(true),onRefine:openRefine,refineActive:refineOpen,
-                onAccept,acceptState,acceptDisabled:computeChanges(active).length===0,acceptError,
-                scanning:groupScanState==="scanning",onRescan:rescanTransitions}),
-              active
-                ?h(Body,{entry:active,onPropChange:(prop,o)=>setPropOverride(prop,o),snap})
-                :h("div",{className:"tl-empty"},"Select a transition to inspect and edit it")),
-            h(RefinePanel,{open:refineOpen,onClose:()=>setRefineOpen(false),phase:refinePhase,label:refineLabel,
-              refineType,onType:changeRefineType,suggestions:refineSuggestions,summary:refineSummary,error:refineError,
-              appliedIds,onApply:applySuggestion,onApplyAll:applyAllSuggestions,
-              mode:refineMode,onMode:changeRefineMode,llmAvailable,cliInstalled,onStart:startScan}),
+            gate==="ready"
+              ? h(React.Fragment,null,
+                  h("div",{className:"tl-panel-main"},
+                    h(Header,{entries,active,onSelect:setActiveId,onReset:resetOverrides,onCopy:copyValues,copied,
+                      snap,setSnap,onMinimize:()=>setMinimized(true),onRefine:openRefine,refineActive:refineOpen,
+                      onAccept,acceptState,acceptDisabled:computeChanges(active).length===0,acceptError,
+                      scanning:groupScanState==="scanning",onRescan:rescanTransitions}),
+                    active
+                      ?h(Body,{entry:active,onPropChange:(prop,o)=>setPropOverride(prop,o),snap})
+                      :h("div",{className:"tl-empty"},"Select a transition to inspect and edit it")),
+                  h(RefinePanel,{open:refineOpen,onClose:()=>setRefineOpen(false),phase:refinePhase,label:refineLabel,
+                    refineType,onType:changeRefineType,suggestions:refineSuggestions,summary:refineSummary,error:refineError,
+                    appliedIds,onApply:applySuggestion,onApplyAll:applyAllSuggestions,
+                    mode:refineMode,onMode:changeRefineMode,llmAvailable,cliInstalled,onStart:startScan,
+                    lanes:active?.effectiveTimings||[]}))
+              : h("div",{className:"tl-panel-main"},
+                  gate==="blocked" && h("div",{className:"tl-gate"},
+                    h("div",{className:"tl-gate-col"},
+                      h("div",{className:"tl-gate-title"},"Before we start"),
+                      h("p",{className:"tl-gate-text"},
+                        "Please run the ",h("code",{className:"tl-code"},"/refine live"),
+                        " command in your agent to enable live features, such as scanning and refining transitions."))),
+                  gate==="scanning" && h("div",{className:"tl-gate"},
+                    h("div",{className:"tl-gate-col"},
+                      h("div",{className:"tl-gate-pill-wrap"},
+                        h(BorderBeam,{size:"sm",colorVariant:"ocean",theme:"light",borderRadius:18,duration:2.6,saturation:2,brightness:1.6,className:"tl-gate-beam"},
+                          h("span",{className:"tl-gate-beam-fill"})),
+                        h("span",{className:"tl-gate-pill"},
+                          h(DotmLoader),
+                          h("span",{className:"tl-gate-pill-label"},"Agent is scanning your transitions"))),
+                      h("p",{className:"tl-gate-sub"},"Just a moment while we get things ready.")))),
+            toast&&createPortal(
+              h("div",{className:"tl-toast-wrap","aria-live":"polite"},
+                h("div",{className:cx("tl-toast",toast.closing&&"is-closing")},
+                  h("span",{className:"tl-toast-ic"},
+                    toast.loader?h(DotmLoader):h(Ic,{name:"accept",size:14})),
+                  h("span",null,toast.msg))),
+              document.body),
           ),
         ),
         minimized&&h("div",{className:"tl-pill",onClick:()=>setMinimized(false)},

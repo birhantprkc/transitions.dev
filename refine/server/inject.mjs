@@ -14,6 +14,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const DEMO_PATH = fileURLToPath(new URL("../demo.html", import.meta.url));
+const PKG_PATH = fileURLToPath(new URL("../package.json", import.meta.url));
 
 // Absolute module URLs so the injected script works without an import map.
 const REACT_URL = "https://esm.sh/react@19";
@@ -40,7 +41,7 @@ function stripSkipRegions(css) {
   return css.replace(/\/\*\s*@inject-skip-start[\s\S]*?@inject-skip-end\s*\*\//g, "").trim();
 }
 
-function buildJs(scriptSrc) {
+function buildJs(scriptSrc, version) {
   let js = scriptSrc;
   // Drop everything from the demo-only boxes onward (App + createRoot render).
   const cut = js.indexOf(CUT_MARKER);
@@ -57,7 +58,7 @@ function buildJs(scriptSrc) {
   // works on any port the CLI chose (the script is served BY the relay).
   js = js.replace(
     /(import\s+\{\s*createPortal\s*\}\s+from\s+"[^"]+";)/,
-    `$1\n    try { if (typeof window !== "undefined" && !window.REFINE_RELAY_URL) window.REFINE_RELAY_URL = new URL(import.meta.url).origin; } catch (e) {}`
+    `$1\n    try { if (typeof window !== "undefined") { if (!window.REFINE_RELAY_URL) window.REFINE_RELAY_URL = new URL(import.meta.url).origin; window.__TX_REFINE_VERSION = ${JSON.stringify(version || "")}; } } catch (e) {}`
   );
 
   return js.trim();
@@ -112,8 +113,11 @@ export async function buildInjectModule({ noCache = false } = {}) {
     throw new Error("inject: could not locate <style> or module <script> in demo.html");
   }
 
+  let version = "";
+  try { version = JSON.parse(await readFile(PKG_PATH, "utf8")).version || ""; } catch (e) {}
+
   const css = stripSkipRegions(styleSrc);
-  const js = buildJs(scriptSrc);
+  const js = buildJs(scriptSrc, version);
   _cache = `${js}\n${buildEpilogue(css)}`;
   return _cache;
 }
