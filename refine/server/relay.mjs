@@ -91,6 +91,13 @@ const PENDING_TIMEOUT_MS = Number(process.env.REFINE_PENDING_TIMEOUT_MS) || 1200
 // to stop (it returns {stop:true} from /jobs/next). 0 disables. Only the chat
 // loop is affected — a wired REFINE_AGENT_CMD never polls /jobs/next.
 const POLLER_IDLE_STOP_MS = Number(process.env.REFINE_POLLER_IDLE_STOP_MS) || 600000;
+// After a Stop (manual or idle), hold the poller "stopped" for this long: every
+// GET /jobs/next keeps getting {stop:true} and /health reports the poller
+// inactive. Without it, a single straggler poll fired right after the stop
+// (an agent mid-backoff, or one that batches a poll before exiting) re-registers
+// as live and the panel flips "Live" back on a few seconds later. A genuine
+// re-run of `/refine live` after the window resumes normally.
+const STOP_GRACE_MS = Number(process.env.REFINE_STOP_GRACE_MS) || 5000;
 
 /** @type {Map<string, Job>} */
 const jobs = new Map();
@@ -99,7 +106,10 @@ const now = () => Date.now();
 // When did a `/refine live` agent last poll? Used to know if LLM mode can be
 // served by a live editor agent (vs. needing REFINE_AGENT_CMD).
 let lastPollAt = 0;
-const pollerActive = () => now() - lastPollAt < POLLER_TTL_MS;
+// While now() < stoppedUntil the relay holds a just-issued Stop (see STOP_GRACE_MS):
+// the poller reports inactive and every /jobs/next answers {stop:true}.
+let stoppedUntil = 0;
+const pollerActive = () => now() >= stoppedUntil && now() - lastPollAt < POLLER_TTL_MS;
 const llmAvailable = () => Boolean(AGENT_CMD) || pollerActive();
 
 // Stop signal for the in-chat `/refine live` loop. Set by POST /poller/stop
@@ -653,6 +663,13 @@ const server = createServer(async (req, res) => {
 
   // GET /jobs/next — long-poll claimed by a `/refine live` agent (LLM jobs).
   if (method === "GET" && path === "/jobs/next") {
+    // Stop-grace window: a Stop was just issued, so keep telling every poller to
+    // exit and don't count these polls as live (we deliberately do NOT update
+    // lastPollAt here). This stops a straggler poll from reviving the session.
+    // A pending job still wins so we never drop real work on the stop edge.
+    if (now() < stoppedUntil && !nextPendingLlm()) {
+      return send(res, 200, { stop: true });
+    }
     lastPollAt = now();
     if (!lastJobAt) lastJobAt = now(); // seed idle window on the loop's first poll
     // Stop signal (manual Stop button or idle auto-stop) → tell the loop to exit.
@@ -661,15 +678,17 @@ const server = createServer(async (req, res) => {
       stopRequested = false;
       lastJobAt = 0;
       lastPollAt = 0; // loop is exiting → report it inactive immediately on /health
+      stoppedUntil = now() + STOP_GRACE_MS; // hold the stop so re-polls can't revive it
       return send(res, 200, { stop: true });
     }
     const deadline = now() + LONGPOLL_MS;
     const attempt = () => {
       if (res.writableEnded) return;
-      if (stopRequested && !nextPendingLlm()) {
+      if ((stopRequested || now() < stoppedUntil) && !nextPendingLlm()) {
         stopRequested = false;
         lastJobAt = 0;
         lastPollAt = 0; // loop is exiting → report it inactive immediately on /health
+        stoppedUntil = now() + STOP_GRACE_MS; // hold the stop so re-polls can't revive it
         return send(res, 200, { stop: true });
       }
       const job = nextPendingLlm();
@@ -688,8 +707,11 @@ const server = createServer(async (req, res) => {
   // POST /poller/stop — the panel's "Stop" button. Flags the in-chat loop to
   // exit on its next poll. No-op for a wired REFINE_AGENT_CMD (never polls).
   if (method === "POST" && path === "/poller/stop") {
+    const wasActive = now() - lastPollAt < POLLER_TTL_MS;
     stopRequested = true;
-    return send(res, 200, { ok: true, stopping: pollerActive() });
+    lastPollAt = 0; // report inactive immediately; a straggler poll won't revive it
+    stoppedUntil = now() + STOP_GRACE_MS; // hold the stop through the grace window
+    return send(res, 200, { ok: true, stopping: wasActive });
   }
 
   const m = path.match(/^\/jobs\/([^/]+)(?:\/(status|result|error))?$/);
