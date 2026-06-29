@@ -19,10 +19,11 @@
 //   4. starts the local refine relay (serves the panel at /inject.js).
 
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync, mkdirSync, cpSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, cpSync, realpathSync, openSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
+import { get as httpGet } from "node:http";
 
 const PKG_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const CWD = process.cwd();
@@ -264,7 +265,108 @@ function log(msg) {
   process.stdout.write(`${msg}\n`);
 }
 
-function cmdLive(args) {
+function rel(p) {
+  return p && p.startsWith(CWD + "/") ? p.slice(CWD.length + 1) : p;
+}
+
+// ── background daemon (for one-shot agent shells) ────────────────────────────
+// Claude Code / Codex / Cursor run a `live` command in a NON-interactive shell
+// that expects the command to EXIT. A foreground relay never exits, so the agent
+// shell buffers (no output) and eventually kills the process group — which runs
+// cleanup and strips the injected tag, so "nothing works". In those shells we
+// instead fork the relay as a detached daemon (its own session via detached:true,
+// so a process-group kill on the agent shell can't reach it), record a PID file,
+// print status, and exit 0. `stop` reads the PID file to tear it down.
+function daemonFile() {
+  return join(CWD, ".refine-relay.json");
+}
+
+// One GET /health probe. Resolves true if the relay answers at all.
+function httpOk(port, path = "/health", timeoutMs = 800) {
+  return new Promise((resolveOk) => {
+    let done = false;
+    const finish = (v) => { if (!done) { done = true; resolveOk(v); } };
+    const req = httpGet({ host: "127.0.0.1", port: Number(port), path, timeout: timeoutMs }, (res) => {
+      res.resume(); // drain so the socket can close
+      finish(res.statusCode >= 200 && res.statusCode < 500);
+    });
+    req.on("timeout", () => { req.destroy(); finish(false); });
+    req.on("error", () => finish(false));
+  });
+}
+
+async function waitForHealth(port, totalMs = 6000) {
+  const deadline = Date.now() + totalMs;
+  while (Date.now() < deadline) {
+    if (await httpOk(port)) return true;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  return false;
+}
+
+// Kill a previously-detached relay for this project (best effort).
+function stopDaemon({ silent = false } = {}) {
+  let rec = null;
+  try { rec = JSON.parse(readFileSync(daemonFile(), "utf8")); } catch {}
+  if (!rec || !rec.pid) return false;
+  let killed = false;
+  try { process.kill(rec.pid, "SIGTERM"); killed = true; } catch {}
+  try { rmSync(daemonFile()); } catch {}
+  if (killed && !silent) log(`✓ stopped background relay (pid ${rec.pid})`);
+  return killed;
+}
+
+// Fork the relay as a detached background process and return once it's healthy
+// (or we give up waiting). The CLI then exits, so the agent's shell command
+// completes and surfaces this output while the relay keeps running.
+async function startDetached({ port, page, env, resolved }) {
+  stopDaemon({ silent: true }); // replace any prior daemon (port clash / dupes)
+
+  const logPath = join(CWD, ".refine-relay.log");
+  let out = "ignore";
+  try { out = openSync(logPath, "a"); } catch {}
+  const child = spawn(process.execPath, [join(PKG_ROOT, "server/relay.mjs")], {
+    detached: true,
+    stdio: ["ignore", out, out],
+    env,
+  });
+  child.unref();
+
+  const llmWired = Boolean(env.REFINE_AGENT_CMD);
+  const record = {
+    pid: child.pid,
+    port: Number(port),
+    page: page || null,
+    log: logPath,
+    version: PKG_VERSION,
+    agentCmd: env.REFINE_AGENT_CMD || null,
+    startedAt: new Date().toISOString(),
+  };
+  try { writeFileSync(daemonFile(), JSON.stringify(record, null, 2) + "\n"); } catch {}
+
+  const healthy = await waitForHealth(port, 6000);
+  log("");
+  if (healthy) {
+    log(`✓ relay running in background (pid ${child.pid}) — http://localhost:${port}`);
+  } else {
+    log(`! relay started (pid ${child.pid}) but wasn't healthy within 6s — check ${rel(logPath)}`);
+  }
+  if (llmWired) {
+    log("✓ agent wired — Refine answers jobs itself (no /refine live loop needed).");
+  } else {
+    log(`• agent NOT wired${resolved && resolved.reason ? ` — ${resolved.reason}` : ""}.`);
+    log("  LLM jobs fall back to a /refine live poller. To wire a persistent agent,");
+    log("  re-run with --agent <cursor|claude|codex> (that CLI must be on PATH).");
+  }
+  log("");
+  log("Next:");
+  log("  1. Open your app and hard-refresh — the timeline panel is on the page.");
+  log("  2. Click Refine.");
+  log(`  Stop it (and remove the injected tag):  npx transitions-refine stop`);
+  log(`  Logs:  ${rel(logPath)}`);
+}
+
+async function cmdLive(args) {
   const port = String(args.port || process.env.REFINE_RELAY_PORT || 7331);
   const page = findPage(args.page);
 
@@ -312,6 +414,18 @@ function cmdLive(args) {
     log(`• LLM not wired — ${resolved.reason}.`);
   }
 
+  // 2.75) In a one-shot agent shell (Claude Code / Codex / Cursor tool calls),
+  //       stdout isn't a TTY and the command is expected to exit. Run the relay
+  //       as a detached daemon and return, so the agent gets output + a persistent
+  //       relay. A real interactive terminal (TTY) keeps the foreground Ctrl-C UX.
+  //       Override either way with --detach / --foreground.
+  const inAgentShell = !process.stdout.isTTY;
+  const detach = Boolean(args.detach) || (inAgentShell && !args.foreground);
+  if (detach) {
+    await startDetached({ port, page, env, resolved });
+    return;
+  }
+
   // 3) start the relay (foreground; Ctrl-C stops it + reverts the injection)
   const relay = spawn(process.execPath, [join(PKG_ROOT, "server/relay.mjs")], {
     stdio: "inherit",
@@ -354,21 +468,28 @@ function cmdLive(args) {
 }
 
 function cmdStop(args) {
-  const page = findPage(args.page);
+  // 1) kill a background daemon if one is recorded for this project. Prefer the
+  //    page the daemon injected (so we clean the right file even without --page).
+  let rec = null;
+  try { rec = JSON.parse(readFileSync(daemonFile(), "utf8")); } catch {}
+  const killed = stopDaemon();
+
+  // 2) strip the injected tag.
+  const page = findPage(args.page) || (rec && rec.page) || null;
   if (!page || !existsSync(page)) {
-    log("! no HTML entry found to clean. Pass --page <path> if needed.");
+    if (!killed) log("! no HTML entry found to clean. Pass --page <path> if needed.");
     return;
   }
   const html = readFileSync(page, "utf8");
   if (!html.includes(MARK_START)) {
-    log(`nothing to remove in ${page.replace(CWD + "/", "")}`);
+    if (!killed) log(`nothing to remove in ${rel(page)}`);
     return;
   }
   writeFileSync(page, stripTag(html));
-  log(`✓ removed injected tag from ${page.replace(CWD + "/", "")}`);
+  log(`✓ removed injected tag from ${rel(page)}`);
 }
 
-function main() {
+async function main() {
   const args = parseArgs(process.argv.slice(2));
   const cmd = args._[0] || "live";
   if (cmd === "live") return cmdLive(args);
@@ -377,11 +498,16 @@ function main() {
   log("  npx transitions-refine live                 # inject panel + relay; auto-wire your agent CLI");
   log("  npx transitions-refine live --agent claude  # force an agent: cursor | claude | codex");
   log("  npx transitions-refine live --llm           # install the Cursor CLI if no agent is found");
-  log("  npx transitions-refine stop                 # remove the injected tag");
+  log("  npx transitions-refine stop                 # stop the relay + remove the injected tag");
   log("");
   log("Options: --page <html>  --port <n>  --agent <cursor|claude|codex>  --llm");
-  log("It prefers the agent hosting this run (Cursor/Claude Code/Codex) so Refine uses");
-  log("the subscription you already have. Or set REFINE_AGENT_CMD to wire any CLI.");
+  log("         --detach        run the relay in the background and exit (default in agent shells)");
+  log("         --foreground    keep the relay in the foreground (Ctrl-C to stop)");
+  log("");
+  log("In a coding agent (Claude Code / Codex / Cursor) `live` auto-detaches: it starts");
+  log("a background relay, wires that agent's CLI, and exits — so just running the command");
+  log("works. It prefers the agent hosting this run so Refine uses the subscription you");
+  log("already have. Or set REFINE_AGENT_CMD to wire any CLI.");
   process.exit(cmd ? 1 : 0);
 }
 
@@ -400,7 +526,10 @@ function isCliEntry() {
   return resolve(process.argv[1]) === resolve(self);
 }
 if (isCliEntry()) {
-  main();
+  main().catch((e) => {
+    log(`! refine failed: ${e && e.message ? e.message : e}`);
+    process.exit(1);
+  });
 }
 
 export { AGENTS, HOST_PRECEDENCE, detectHostAgent, resolveAgent, findBin };
