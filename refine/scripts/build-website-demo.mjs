@@ -314,25 +314,23 @@ const SKILL_BTN_CSS = `
       cursor: pointer; text-decoration: none; white-space: nowrap;
       -webkit-tap-highlight-color: transparent;
       transition: background-color 200ms cubic-bezier(0.22, 1, 0.36, 1),
-                  color 200ms cubic-bezier(0.22, 1, 0.36, 1);
+                  color 200ms cubic-bezier(0.22, 1, 0.36, 1),
+                  scale 0.12s ease;
     }
     button.skill-btn { -webkit-appearance: none; appearance: none; }
     .skill-btn--secondary { background: #f5f5f5; color: #17181c; }
     .skill-btn--secondary:hover { background: #ececec; }
-    .skill-btn--secondary:active { background: #e0e0e0; }
+    .skill-btn--secondary:active { scale: 0.96; }
     html[data-theme="dark"] .skill-btn--secondary {
       background: rgba(255, 255, 255, 0.08); color: #ededed;
     }
     html[data-theme="dark"] .skill-btn--secondary:hover {
       background: rgba(255, 255, 255, 0.12);
     }
-    html[data-theme="dark"] .skill-btn--secondary:active {
-      background: rgba(255, 255, 255, 0.14);
-    }
     .skill-btn svg {
       width: 16px; height: 16px; display: block; fill: currentColor;
     }
-    .skill-btn .wd-dd-caret { fill: none; flex-shrink: 0; }
+    .skill-btn .wd-dd-caret { fill: none; flex-shrink: 0; opacity: 0.5; }
     .skill-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }`;
 
 const DROPDOWN_CSS = `
@@ -730,7 +728,7 @@ ${DROPDOWN_CSS}
     <header class="header">
       <p class="hero-eyebrow">Refine<span class="beta-badge">Beta</span></p>
       <h1 class="title">Live demo</h1>
-      <p class="subtitle">Demo mode: Agent responses are simulated, no LLM is used. The transition is intentionally not ideal to demonstrate the refine functionality.</p>
+      <p class="subtitle">Demo mode: No LLM is used on this website. Agent responses are simulated to showcase the functionality of the Refine tool.</p>
       <div id="root"></div>
     </header>
   </main>
