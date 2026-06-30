@@ -514,7 +514,10 @@ const HEAD_THEME_SCRIPT = `  <script>
     (function () {
       try {
         if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+          // Page chrome AND the embedded Refine panel follow the same switch on
+          // this showcase page (data-tl-theme drives the panel + its portals).
           document.documentElement.setAttribute("data-theme", "dark");
+          document.documentElement.setAttribute("data-tl-theme", "dark");
         }
       } catch (e) {}
     })();
@@ -532,6 +535,9 @@ const NAV_SCRIPTS = `  <script>
       function applyTheme(next) {
         if (next === "dark") html.setAttribute("data-theme", "dark");
         else html.removeAttribute("data-theme");
+        // Keep the embedded Refine panel (and its body-portaled menus/toasts) in
+        // lockstep with the page toggle on this showcase page.
+        html.setAttribute("data-tl-theme", next === "dark" ? "dark" : "light");
         if (iconStack) {
           iconStack.classList.remove("no-anim");
           iconStack.setAttribute("data-active", next === "dark" ? "sun" : "moon");
