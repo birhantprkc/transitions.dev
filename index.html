@@ -64,6 +64,16 @@
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Roboto+Mono:wght@400;500&display=swap"
     rel="stylesheet"
   />
+  <!-- Preload the Saans display face (hero title) so it's fetched before
+       first paint — paired with font-display: optional this removes the
+       fallback→Saans flash/reflow. -->
+  <link
+    rel="preload"
+    as="font"
+    type="font/woff2"
+    href="assets/fonts/Saans-Medium.woff2"
+    crossorigin
+  />
 
   <script type="application/ld+json">
     {
@@ -648,7 +658,7 @@
     /* ─── Main container ──────────────────────────────────────── */
     .app {
       position: relative;
-      max-width: 1008px;
+      max-width: 1240px;
       margin: 0 auto;
       width: 100%;
       padding: 0 24px 64px;
@@ -816,6 +826,262 @@
        icon doesn't appear to "fly in" when the page loads. */
     .theme-icon-stack.no-anim .theme-icon { transition: none; }
 
+    /* ─── Site nav (shared bar: logo + menu + actions) ─────────── */
+    /* Mirrors the /refine.html top bar. Lives as the first child of
+       .app so the brand lines up with the page content column. */
+    .site-nav {
+      position: relative;
+      z-index: 50;
+      width: 100%;
+    }
+    .site-nav-inner {
+      position: relative;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 0;
+    }
+    .site-nav-left {
+      display: flex;
+      align-items: center;
+      gap: 34px;
+      min-width: 0;
+    }
+    .site-nav-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      height: 35px;
+      padding: 5px 0;
+      text-decoration: none;
+      color: var(--text);
+      flex-shrink: 0;
+    }
+    .brand-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      color: var(--icon-color);
+    }
+    /* Natural 18×20.295 ratio centered in the 24px box (Figma vector
+       inset 7.72%/12.5%), not stretched edge-to-edge. */
+    .brand-mark svg { width: 18px; height: 20.295px; display: block; }
+    .brand {
+      transition: transform 400ms cubic-bezier(0.22, 1, 0.36, 1);
+      transform-origin: center;
+      will-change: transform;
+    }
+    .brand:hover { transform: scale(1.02); }
+    .brand-mark {
+      transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
+      transform-origin: center;
+    }
+    .brand:hover .brand-mark { transform: rotate(60deg); }
+    @media (prefers-reduced-motion: reduce) {
+      .brand, .brand-mark { transition: none; }
+      .brand:hover, .brand:hover .brand-mark { transform: none; }
+    }
+    .brand-word {
+      font-size: 15px;
+      font-weight: 500;
+      line-height: 1;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+    .brand-word-dim { color: var(--text-muted); }
+
+    /* Tertiary text pills — quiet by default, soft tint when active. */
+    .site-nav-menu {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .nav-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 36px;
+      padding: 0 13px;
+      border-radius: 50px;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 16px;
+      color: var(--text-muted);
+      text-decoration: none;
+      white-space: nowrap;
+      transition: background-color 0.15s ease, color 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .nav-pill:hover { color: var(--text); background: rgba(0, 0, 0, 0.03); }
+    html[data-theme="dark"] .nav-pill:hover { background: rgba(255, 255, 255, 0.06); }
+    .nav-pill--active {
+      color: var(--text);
+      background: rgba(0, 0, 0, 0.03);
+    }
+    html[data-theme="dark"] .nav-pill--active { background: rgba(255, 255, 255, 0.06); }
+    .nav-pill:focus-visible {
+      outline: 2px solid var(--icon-color);
+      outline-offset: 2px;
+    }
+
+    /* ─── Mobile hamburger (logram-style two-line → ✕ morph) ────── */
+    /* Hidden on desktop; the media query below flips it to inline-flex
+       and hides the .site-nav-menu pills. */
+    .nav-burger { display: none; }
+    .nav-burger-box {
+      position: relative;
+      width: 16px;
+      height: 16px;
+      display: block;
+      color: var(--icon-color-muted);
+      transition: color 0.15s ease;
+    }
+    .nav-burger:hover .nav-burger-box { color: var(--icon-color); }
+    .nav-burger-line {
+      position: absolute;
+      left: 1px;
+      right: 1px;
+      height: 1.5px;
+      border-radius: 2px;
+      background: currentColor;
+      transform-origin: center;
+      /* Slide to centre (top), then rotate into the ✕. Calm ease-out. */
+      transition:
+        top 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+        transform 0.3s cubic-bezier(0.22, 1, 0.36, 1) 0.05s;
+    }
+    .nav-burger-line--top { top: 5px; }
+    .nav-burger-line--bottom { top: 9.5px; }
+    .nav-burger[aria-expanded="true"] .nav-burger-line {
+      /* Centre line of a 16px box with a 1.5px bar = (16 − 1.5)/2. */
+      top: 7.25px;
+      /* Rotate fires first on open so the lines cross as they meet. */
+      transition:
+        top 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+        transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .nav-burger[aria-expanded="true"] .nav-burger-line--top { transform: rotate(45deg); }
+    .nav-burger[aria-expanded="true"] .nav-burger-line--bottom { transform: rotate(-45deg); }
+
+    /* ─── Mobile menu overlay + blurred backdrop ───────────────── */
+    /* Backdrop: white @ 90% with a 20px blur (per design). Sits below
+       the menu list but above page content; the top bar stays clickable
+       on top of it (.site-nav-inner z-index). */
+    .mobile-menu-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      background: rgba(255, 255, 255, 0.9);
+      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(20px);
+      opacity: 0;
+      visibility: hidden;
+      transition:
+        opacity 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+        visibility 0s linear 0.35s;
+    }
+    html[data-theme="dark"] .mobile-menu-backdrop {
+      background: rgba(18, 18, 18, 0.9);
+    }
+    body.menu-open .mobile-menu-backdrop {
+      opacity: 1;
+      visibility: visible;
+      transition:
+        opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+        visibility 0s;
+    }
+    body.menu-closing .mobile-menu-backdrop {
+      opacity: 0;
+      visibility: visible;
+      transition: opacity 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .mobile-menu {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 2;
+      padding: 88px 30px 30px;
+      visibility: hidden;
+      pointer-events: none;
+      transition: visibility 0s linear 0.4s;
+    }
+    body.menu-open .mobile-menu,
+    body.menu-closing .mobile-menu {
+      visibility: visible;
+      transition: visibility 0s;
+    }
+    body.menu-open .mobile-menu { pointer-events: auto; }
+    .mobile-menu-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    .mobile-menu-link {
+      display: inline-block;
+      font-family: var(--font-sans);
+      font-size: 20px;
+      font-weight: 500;
+      line-height: 1.2;
+      letter-spacing: -0.01em;
+      color: var(--text);
+      text-decoration: none;
+      -webkit-tap-highlight-color: transparent;
+      /* Closed = pre-entrance (down + blurred + invisible). Opening
+         flips to resting; the stagger lands the eye top-to-bottom. */
+      opacity: 0;
+      transform: translateY(12px);
+      filter: blur(3px);
+      transition:
+        opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+        transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+        filter 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .mobile-menu-link--2 { transition-delay: 40ms; }
+    .mobile-menu-link--3 { transition-delay: 80ms; }
+    body.menu-open .mobile-menu-link {
+      opacity: 1;
+      transform: translateY(0);
+      filter: blur(0);
+    }
+    /* Exit decouples from the stagger: one quiet 200ms fade in place,
+       no Y-return / blur, so closing doesn't replay the reveal. */
+    body.menu-closing .mobile-menu-link {
+      opacity: 0;
+      transform: translateY(0);
+      filter: blur(0);
+      transition:
+        opacity 0.2s ease,
+        transform 0s linear,
+        filter 0s linear;
+      transition-delay: 0s;
+    }
+    body.menu-open { overflow: hidden; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .nav-burger-line,
+      .mobile-menu-backdrop,
+      .mobile-menu,
+      .mobile-menu-link {
+        transition: none !important;
+      }
+    }
+
     /* ─── Header (Figma demo page + border-beam vertical rhythm) ─ */
     .header {
       position: relative;
@@ -825,7 +1091,7 @@
       flex-direction: column;
       align-items: center;
       padding-top: 48px;
-      padding-bottom: 40px;
+      padding-bottom: 80px;
       text-align: center;
     }
 
@@ -879,21 +1145,115 @@
       display: block;
     }
 
-    .title {
-      font-size: 22px;
+    /* Saans — used for the hero title (Medium / 500). Same face the
+       /refine + /skill pages use. */
+    @font-face {
+      font-family: "Saans";
+      src: url("assets/fonts/Saans-Medium.woff2") format("woff2"),
+           url("assets/fonts/Saans-Medium.woff") format("woff");
       font-weight: 500;
-      line-height: 34px;
+      font-style: normal;
+      /* optional (not swap): the browser waits a brief block period for the
+         preloaded font, then renders Saans with no late swap. */
+      font-display: optional;
+    }
+
+    .title {
+      margin-top: 8px;
+      font-family: "Saans", var(--font-sans);
+      font-size: 36px;
+      font-weight: 500;
+      line-height: 42px;
       color: var(--text);
-      letter-spacing: -0.01em;
+      letter-spacing: -0.005em;
+      text-align: center;
     }
 
     .subtitle {
-      margin-top: 4px;
-      max-width: 560px;
-      font-size: 15px;
+      margin-top: 8px;
+      max-width: 430px;
+      font-size: 16px;
       font-weight: 400;
-      line-height: 22px;
+      line-height: 24px;
       color: var(--text-muted);
+      text-align: center;
+    }
+    /* Slightly darker than the body copy — points at the Skill page. */
+    .subtitle-skill {
+      color: var(--text);
+      text-decoration: none;
+    }
+    .subtitle-skill:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+    /* Hero CTA row (same component as /refine + /skill). Primary pill is
+       dark in light theme and light in dark theme; secondary keeps a
+       neutral fill. */
+    .skill-cta-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 20px;
+    }
+    .skill-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      height: 40px;
+      padding: 0 16px;
+      border: 0;
+      border-radius: 26px;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 13px;
+      cursor: pointer;
+      text-decoration: none;
+      white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+      transition: background-color 200ms cubic-bezier(0.22, 1, 0.36, 1),
+                  color 200ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .skill-btn--primary {
+      background: #17181c;
+      color: #ffffff;
+      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+    }
+    .skill-btn--primary:hover { background: #2a2a2a; }
+    .skill-btn--primary:active { background: #000000; }
+    html[data-theme="dark"] .skill-btn--primary {
+      background: #ffffff;
+      color: #0d0d0d;
+    }
+    html[data-theme="dark"] .skill-btn--primary:hover { background: #e8e8e8; }
+    html[data-theme="dark"] .skill-btn--primary:active { background: #d8d8d8; }
+
+    .skill-btn--secondary {
+      background: #f5f5f5;
+      color: #17181c;
+    }
+    .skill-btn--secondary:hover { background: #ececec; }
+    .skill-btn--secondary:active { background: #e0e0e0; }
+    html[data-theme="dark"] .skill-btn--secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: #ededed;
+    }
+    html[data-theme="dark"] .skill-btn--secondary:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+    html[data-theme="dark"] .skill-btn--secondary:active {
+      background: rgba(255, 255, 255, 0.14);
+    }
+    .skill-btn svg {
+      width: 16px;
+      height: 16px;
+      display: block;
+      fill: currentColor;
+    }
+    .skill-btn:focus-visible {
+      outline: 2px solid var(--text);
+      outline-offset: 3px;
     }
 
     /* ─── Cards grid ──────────────────────────────────────────── */
@@ -904,11 +1264,6 @@
       justify-content: center;
       gap: 24px;
       align-items: start;
-    }
-    /* The class-level `display: grid` outranks the UA `[hidden]` rule,
-       so an inactive view panel must be hidden explicitly. */
-    .cards[hidden] {
-      display: none;
     }
 
     /* ─── Card ────────────────────────────────────────────────── */
@@ -2970,69 +3325,6 @@
       pointer-events: none;
     }
 
-    /* ─── Header view switcher (Transitions / Motion tokens) ────
-       Reuses the P16 sliding-pill pattern and its --p16-* tokens so
-       the header switcher matches the in-grid "Tabs sliding" demo,
-       but keeps its own classes so the two stay independent. The pill
-       (.view-tabs-indicator) sits behind the labels; JS writes its
-       transform/width inline and CSS owns the tween. */
-    .view-tabs {
-      position: relative;
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      margin: 40px auto 0;
-      padding: 3px;
-      border-radius: 48px;
-      background: var(--p16-bar-bg);
-    }
-    .view-tab {
-      position: relative;
-      appearance: none;
-      box-sizing: border-box;
-      border: 0;
-      background: transparent;
-      height: 30px;
-      padding: 4px 12px;
-      font-family: var(--font-sans);
-      font-size: 13px;
-      font-weight: 500;
-      line-height: 1.4;
-      color: var(--p16-text-muted);
-      cursor: pointer;
-      border-radius: 48px;
-      z-index: 1;
-      transition: color var(--p16-dur) var(--p16-ease);
-      -webkit-tap-highlight-color: transparent;
-      white-space: nowrap;
-    }
-    .view-tab:not([aria-selected="true"]):hover {
-      color: var(--p16-text-active);
-    }
-    .view-tab[aria-selected="true"] {
-      color: var(--p16-text-active);
-    }
-    .view-tab:focus-visible {
-      outline: 2px solid var(--text);
-      outline-offset: 2px;
-    }
-    .view-tabs-indicator {
-      position: absolute;
-      top: 3px;
-      left: 0;
-      height: 30px;
-      width: 0;
-      background: var(--p16-pill-bg);
-      border-radius: 48px;
-      transform: translateX(0);
-      transition:
-        transform var(--p16-dur) var(--p16-ease),
-        width     var(--p16-dur) var(--p16-ease);
-      will-change: transform, width;
-      z-index: 0;
-      pointer-events: none;
-    }
-
     /* Motion-token card: reuses the .card / .card-stage / .card-meta
        shell but the stage holds a single centered illustration and no
        Animate / Copy controls. */
@@ -3651,33 +3943,21 @@
 
     @media (max-width: 639px) {
       .app { padding: 0 20px 48px; }
-      .top-bar { right: 20px; top: 12px; }
-      /* On phones the Skill pill collapses to a 36px icon so the
-         row doesn't get crowded next to the theme/GitHub/X icons.
-         The GitHub stars pill keeps its label so the live star
-         count stays visible — that's the metric people came for. */
-      .icon-btn-pill .pill-label { display: none; }
-      .icon-btn-pill { width: 36px; padding: 0; min-width: 36px; }
-      #gh-stars-btn .pill-label { display: inline-block; }
-      #gh-stars-btn { width: auto; padding: 0 12px; }
+      /* Collapse the inline nav pills into the hamburger; the GitHub
+         pill keeps its live star count (the metric people came for). */
+      .site-nav-menu { display: none; }
+      .nav-burger { display: inline-flex; }
       .header {
         height: auto;
         min-height: 180px;
-        /* +20px of head-room over the desktop baseline so the
-           absolutely-positioned top-bar sits clear of the header
-           icon on mobile — was 60, now 80 to add the 20 px gap
-           between the bottom of the top-bar pill row and where
-           the header content starts. */
-        padding-top: 80px;
-        padding-bottom: 32px;
+        /* The bar now lives in normal flow (no absolute overlap to
+           clear), so the hero just needs a small gap below it. */
+        padding-top: 24px;
+        padding-bottom: 72px;
         justify-content: flex-end;
       }
-      .title { font-size: 20px; line-height: 28px; }
+      .title { font-size: 26px; line-height: 32px; }
       .subtitle { font-size: 15px; line-height: 22px; }
-      /* Let the subtitle wrap naturally on narrow viewports;
-         the desktop layout uses a hardcoded <br/> after "that" which
-         produces awkward extra breaks on mobile. */
-      .subtitle br { display: none; }
       /* Cards span the full available width (viewport − 20px margins)
          instead of the fixed 320px desktop width. */
       .cards { grid-template-columns: 1fr; }
@@ -4101,85 +4381,110 @@
   <a href="#main" class="skip-link">Skip to content</a>
 
   <main id="main" class="app">
-    <nav class="top-bar" aria-label="Page actions">
-      <!-- Skill pill — entry point to the dedicated /skill.html page.
-           Uses the exact Figma 450:487 "e-reader" SVG (14×16 viewBox)
-           so the icon proportions match the design pixel-for-pixel. -->
-      <a
-        class="icon-btn-pill"
-        href="skill.html"
-        aria-label="Open Transitions.dev Skill page"
-      >
-        <svg
-          aria-hidden="true"
-          width="14"
-          height="16"
-          viewBox="0 0 14 16"
-          fill="currentColor"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path d="M12 0H2C1.46957 0 0.960859 0.210714 0.585786 0.585786C0.210714 0.960859 0 1.46957 0 2V14C0 14.5304 0.210714 15.0391 0.585786 15.4142C0.960859 15.7893 1.46957 16 2 16H12C12.5304 16 13.0391 15.7893 13.4142 15.4142C13.7893 15.0391 14 14.5304 14 14V2C14 1.46957 13.7893 0.960859 13.4142 0.585786C13.0391 0.210714 12.5304 0 12 0ZM8 11H3V10H8V11ZM11 8H3V7H11V8ZM11 5H3V4H11V5Z" />
-        </svg>
-        <span class="pill-label">Skill</span>
-      </a>
-      <!-- GitHub pill — same component as on /skill, shows live
-           stargazer count fetched once per session from the public
-           GitHub API. Falls back silently to "Star" on network /
-           rate-limit errors so the link itself always works. -->
-      <a
-        class="icon-btn-pill"
-        id="gh-stars-btn"
-        href="https://github.com/Jakubantalik/transitions.dev"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="GitHub repository — star count"
-        data-loading="true"
-      >
-        <svg aria-hidden="true" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
-        </svg>
-        <span class="pill-label" id="gh-stars-count">—</span>
-      </a>
-      <a
-        class="icon-btn"
-        href="https://x.com/jakubantalik"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="X (Twitter)"
-      >
-        <svg class="icon-x" aria-hidden="true" viewBox="0 0 16 17" xmlns="http://www.w3.org/2000/svg">
-          <path
-            fill="currentColor"
-            d="M12.4041 1.39726H14.6953L9.69087 7.2591L15.5781 15.2368H10.9696L7.35741 10.3996L3.22921 15.2368H0.934687L6.28641 8.96575L0.642598 1.39726H5.36795L8.62962 5.81859L12.4041 1.39726ZM11.5992 13.8329H12.8682L4.67667 2.72798H3.31359L11.5992 13.8329Z"
-          />
-        </svg>
-      </a>
-      <button
-        type="button"
-        class="icon-btn theme-toggle"
-        id="theme-toggle"
-        aria-label="Toggle color theme"
-      >
-        <span class="theme-icon-stack no-anim" id="theme-icon-stack" data-active="moon" aria-hidden="true">
-          <img
-            src="assets/theme-moon-01.svg"
-            alt=""
-            class="theme-icon theme-icon-moon"
-            width="16"
-            height="16"
-            decoding="async"
-          />
-          <img
-            src="assets/theme-sun.svg"
-            alt=""
-            class="theme-icon theme-icon-sun"
-            width="16"
-            height="16"
-            decoding="async"
-          />
-        </span>
-      </button>
-    </nav>
+    <header class="site-nav">
+      <div class="site-nav-inner">
+        <div class="site-nav-left">
+          <a class="brand" href="/" aria-label="Transitions.dev home">
+            <span class="brand-mark" aria-hidden="true">
+              <svg viewBox="0 0 18 20.2947" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M9 0L12.5409 1.99176L11.5604 3.73491L10 2.8572V5.14735H8V2.8572L6.43962 3.73491L5.45909 1.99176L9 0ZM14.3613 3.01571L18 5.0625V9.14735H16V7.3794L14.0359 8.51337L13.0359 6.78132L14.9804 5.65867L13.3807 4.75886L14.3613 3.01571ZM4.61925 4.75887L3.01961 5.65867L4.9641 6.78132L3.9641 8.51337L2 7.3794L2 9.14735H0L1.54972e-06 5.0625L3.63873 3.01572L4.61925 4.75887ZM2 11.1473V12.9153L3.9641 11.7813L4.9641 13.5134L3.01961 14.636L4.61925 15.5358L3.63873 17.279L3.57628e-07 15.2322V11.1473H2ZM18 11.1473V15.2322L14.3613 17.279L13.3807 15.5358L14.9804 14.636L13.0359 13.5134L14.0359 11.7813L16 12.9153V11.1473H18ZM10 15.1473V17.4375L11.5604 16.5598L12.5409 18.3029L9 20.2947L5.45908 18.3029L6.43961 16.5598L8 17.4375V15.1473H10Z" fill="currentColor"/>
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M12.0981 9.51337L10 10.7247V13.1474H8V10.7247L5.90192 9.51337L6.90192 7.78132L9 8.99265L11.0981 7.78132L12.0981 9.51337Z" fill="currentColor"/>
+              </svg>
+            </span>
+            <span class="brand-word"><span class="brand-word-strong">Transitions</span><span class="brand-word-dim">.dev</span></span>
+          </a>
+          <nav class="site-nav-menu" aria-label="Primary">
+            <a class="nav-pill nav-pill--active" href="/" aria-current="page">Transitions</a>
+            <a class="nav-pill" href="/skill.html">Skill</a>
+            <a class="nav-pill" href="/refine.html">Refine tool</a>
+          </nav>
+        </div>
+        <div class="site-nav-right">
+          <!-- GitHub pill — shows live stargazer count fetched once per
+               session from the public GitHub API. Falls back silently to
+               "—" on network / rate-limit errors so the link still works. -->
+          <a
+            class="icon-btn-pill"
+            id="gh-stars-btn"
+            href="https://github.com/Jakubantalik/transitions.dev"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub repository — star count"
+            data-loading="true"
+          >
+            <svg aria-hidden="true" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+            </svg>
+            <span class="pill-label" id="gh-stars-count">—</span>
+          </a>
+          <a
+            class="icon-btn"
+            href="https://x.com/jakubantalik"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="X (Twitter)"
+          >
+            <svg class="icon-x" aria-hidden="true" viewBox="0 0 16 17" xmlns="http://www.w3.org/2000/svg">
+              <path
+                fill="currentColor"
+                d="M12.4041 1.39726H14.6953L9.69087 7.2591L15.5781 15.2368H10.9696L7.35741 10.3996L3.22921 15.2368H0.934687L6.28641 8.96575L0.642598 1.39726H5.36795L8.62962 5.81859L12.4041 1.39726ZM11.5992 13.8329H12.8682L4.67667 2.72798H3.31359L11.5992 13.8329Z"
+              />
+            </svg>
+          </a>
+          <button
+            type="button"
+            class="icon-btn theme-toggle"
+            id="theme-toggle"
+            aria-label="Toggle color theme"
+          >
+            <span class="theme-icon-stack no-anim" id="theme-icon-stack" data-active="moon" aria-hidden="true">
+              <img
+                src="assets/theme-moon-01.svg"
+                alt=""
+                class="theme-icon theme-icon-moon"
+                width="16"
+                height="16"
+                decoding="async"
+              />
+              <img
+                src="assets/theme-sun.svg"
+                alt=""
+                class="theme-icon theme-icon-sun"
+                width="16"
+                height="16"
+                decoding="async"
+              />
+            </span>
+          </button>
+          <!-- Mobile-only: morphs from two lines into an ✕, opens the
+               full-screen menu + blurred backdrop below. -->
+          <button
+            type="button"
+            class="icon-btn nav-burger"
+            id="nav-burger"
+            aria-label="Open menu"
+            aria-expanded="false"
+            aria-controls="mobile-menu"
+          >
+            <span class="nav-burger-box" aria-hidden="true">
+              <span class="nav-burger-line nav-burger-line--top"></span>
+              <span class="nav-burger-line nav-burger-line--bottom"></span>
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Full-screen mobile menu. The backdrop is a sibling so it can
+           cover the whole viewport while the top bar stays on top. -->
+      <div class="mobile-menu-backdrop" id="mobile-menu-backdrop"></div>
+      <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile">
+        <ul class="mobile-menu-list">
+          <li><a class="mobile-menu-link mobile-menu-link--1" href="/">Transitions</a></li>
+          <li><a class="mobile-menu-link mobile-menu-link--2" href="/skill.html">Skill</a></li>
+          <li><a class="mobile-menu-link mobile-menu-link--3" href="/refine.html">Refine tool</a></li>
+        </ul>
+      </nav>
+    </header>
 
     <header class="header">
       <div class="header-icon-wrap" aria-hidden="true">
@@ -4200,19 +4505,29 @@
           decoding="async"
         />
       </div>
-      <h1 class="title">Transitions</h1>
+      <h1 class="title">Ready to use UI transitions</h1>
       <p class="subtitle">
-        Collection of the most essential transitions for web apps that<br />
-        you can just copy and paste into any project.
+        Collection of the most essential UI transitions for web apps. Copy
+        and paste them, or use them with <a class="subtitle-skill" href="skill.html">skill</a>
+        directly in your project.
       </p>
-      <div class="view-tabs" data-view-tabs role="tablist" aria-label="View">
-        <span class="view-tabs-indicator" aria-hidden="true"></span>
-        <button type="button" class="view-tab" role="tab" aria-selected="true" data-view="transitions">Transitions</button>
-        <button type="button" class="view-tab" role="tab" aria-selected="false" data-view="tokens">Motion tokens</button>
+      <div class="skill-cta-row">
+        <a class="skill-btn skill-btn--primary" href="#components">Browse</a>
+        <a
+          class="skill-btn skill-btn--secondary"
+          href="https://github.com/Jakubantalik/transitions.dev"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <svg aria-hidden="true" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+          </svg>
+          Github
+        </a>
       </div>
     </header>
 
-    <section class="cards" data-view-panel="transitions" aria-label="Transition prototypes">
+    <section class="cards" id="components" aria-label="Transition prototypes" style="scroll-margin-top: 24px;">
 
       <!-- 1. Card resize -->
       <article class="card" data-proto-card>
@@ -4932,113 +5247,6 @@
 
     </section>
 
-    <!-- Motion tokens view — same card shell, one card per token type,
-         each showing a centered illustration instead of a live preview.
-         Hidden until the "Motion tokens" header tab is selected. -->
-    <section class="cards" data-view-panel="tokens" aria-label="Motion tokens" hidden>
-
-      <!-- 1. Duration -->
-      <article class="card" data-proto-card>
-        <div class="card-stage">
-<svg class="token-illu" role="img" aria-hidden="true" overflow="visible" width="174.12" height="55.2495" viewBox="0 0 174.12 55.2495" fill="none" xmlns="http://www.w3.org/2000/svg"><g><path d="M17.9261 30.5612C26.1583 30.5612 32.8317 23.8877 32.8317 15.6556C32.8317 7.42347 26.1583 0.75 17.9261 0.75C9.69398 0.75 3.02051 7.42347 3.02051 15.6556C3.02051 23.8877 9.69398 30.5612 17.9261 30.5612Z" stroke="var(--n-mid)" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="3.41 3.41"/><path d="M64.7718 30.5612C73.004 30.5612 79.6774 23.8877 79.6774 15.6556C79.6774 7.42347 73.004 0.75 64.7718 0.75C56.5397 0.75 49.8662 7.42347 49.8662 15.6556C49.8662 23.8877 56.5397 30.5612 64.7718 30.5612Z" stroke="var(--n-mid)" stroke-width="1.5"/><path d="M111.618 30.5612C119.851 30.5612 126.524 23.8877 126.524 15.6556C126.524 7.42347 119.851 0.75 111.618 0.75C103.386 0.75 96.7129 7.42347 96.7129 15.6556C96.7129 23.8877 103.386 30.5612 111.618 30.5612Z" stroke="var(--n-strong)" stroke-width="1.5"/><path d="M158.464 30.5612C166.696 30.5612 173.37 23.8877 173.37 15.6556C173.37 7.42347 166.696 0.75 158.464 0.75C150.232 0.75 143.559 7.42347 143.559 15.6556C143.559 23.8877 150.232 30.5612 158.464 30.5612Z" stroke="var(--n-strong)" stroke-width="1.5"/><path d="M0 49.7266C0 51.9357 1.79086 53.7266 4 53.7266C6.20914 53.7266 8 51.9357 8 49.7266C8 47.5174 6.20914 45.7266 4 45.7266C1.79086 45.7266 0 47.5174 0 49.7266ZM173.53 50.2569C173.823 49.964 173.823 49.4891 173.53 49.1962L168.757 44.4233C168.464 44.1304 167.99 44.1304 167.697 44.4233C167.404 44.7162 167.404 45.191 167.697 45.4839L171.939 49.7266L167.697 53.9692C167.404 54.2621 167.404 54.737 167.697 55.0299C167.99 55.3228 168.464 55.3228 168.757 55.0299L173.53 50.2569ZM4 49.7266V50.4766H173V49.7266V48.9766H4V49.7266Z" fill="var(--n-faint)"/></g></svg>
-        </div>
-        <div class="card-meta">
-          <div class="card-title">Duration</div>
-          <div class="card-subtitle">How long the motion plays</div>
-        </div>
-        <button type="button" class="card-copy" aria-label="Copy Duration token CSS" data-copy-key="tok-duration">
-          <svg class="icon-copy" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-          </svg>
-          <svg class="icon-check" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        </button>
-      </article>
-
-      <!-- 2. Easing -->
-      <article class="card" data-proto-card>
-        <div class="card-stage">
-<svg class="token-illu" role="img" aria-hidden="true" overflow="visible" width="177.5" height="56.5" viewBox="0 0 177.5 56.5" fill="none" xmlns="http://www.w3.org/2000/svg"><g><path d="M6.25 55.75C9.28757 55.75 11.75 53.2876 11.75 50.25C11.75 47.2124 9.28757 44.75 6.25 44.75C3.21243 44.75 0.75 47.2124 0.75 50.25C0.75 53.2876 3.21243 55.75 6.25 55.75Z" stroke="var(--n-mid)" stroke-width="1.5"/><path d="M29.35 35.95C32.9951 35.95 35.95 32.9951 35.95 29.35C35.95 25.7049 32.9951 22.75 29.35 22.75C25.7049 22.75 22.75 25.7049 22.75 29.35C22.75 32.9951 25.7049 35.95 29.35 35.95Z" stroke="var(--n-mid)" stroke-width="1.5"/><g><path d="M57.95 21.65C62.2026 21.65 65.65 18.2026 65.65 13.95C65.65 9.69741 62.2026 6.25 57.95 6.25C53.6974 6.25 50.25 9.69741 50.25 13.95C50.25 18.2026 53.6974 21.65 57.95 21.65Z" stroke="var(--n-strong)" stroke-width="1.5"/><path d="M57.95 21.65C62.2026 21.65 65.65 18.2026 65.65 13.95C65.65 9.69741 62.2026 6.25 57.95 6.25C53.6974 6.25 50.25 9.69741 50.25 13.95C50.25 18.2026 53.6974 21.65 57.95 21.65Z" stroke="var(--n-strong)" stroke-width="1.5"/></g><g><path d="M90.95 16.15C95.2026 16.15 98.65 12.7026 98.65 8.45C98.65 4.19741 95.2026 0.75 90.95 0.75C86.6974 0.75 83.25 4.19741 83.25 8.45C83.25 12.7026 86.6974 16.15 90.95 16.15Z" stroke="var(--n-strong)" stroke-width="1.5"/><path d="M90.95 16.15C95.2026 16.15 98.65 12.7026 98.65 8.45C98.65 4.19741 95.2026 0.75 90.95 0.75C86.6974 0.75 83.25 4.19741 83.25 8.45C83.25 12.7026 86.6974 16.15 90.95 16.15Z" stroke="var(--n-strong)" stroke-width="1.5"/></g><g><path d="M123.95 21.65C128.203 21.65 131.65 18.2026 131.65 13.95C131.65 9.69741 128.203 6.25 123.95 6.25C119.697 6.25 116.25 9.69741 116.25 13.95C116.25 18.2026 119.697 21.65 123.95 21.65Z" stroke="var(--n-strong)" stroke-width="1.5"/><path d="M123.95 21.65C128.203 21.65 131.65 18.2026 131.65 13.95C131.65 9.69741 128.203 6.25 123.95 6.25C119.697 6.25 116.25 9.69741 116.25 13.95C116.25 18.2026 119.697 21.65 123.95 21.65Z" stroke="var(--n-strong)" stroke-width="1.5"/></g><path d="M150.35 35.95C153.995 35.95 156.95 32.9951 156.95 29.35C156.95 25.7049 153.995 22.75 150.35 22.75C146.705 22.75 143.75 25.7049 143.75 29.35C143.75 32.9951 146.705 35.95 150.35 35.95Z" stroke="var(--n-mid)" stroke-width="1.5"/><path d="M171.25 55.75C174.288 55.75 176.75 53.2876 176.75 50.25C176.75 47.2124 174.288 44.75 171.25 44.75C168.212 44.75 165.75 47.2124 165.75 50.25C165.75 53.2876 168.212 55.75 171.25 55.75Z" stroke="var(--n-mid)" stroke-width="1.5"/></g></svg>
-        </div>
-        <div class="card-meta">
-          <div class="card-title">Easing</div>
-          <div class="card-subtitle">The acceleration curve</div>
-        </div>
-        <button type="button" class="card-copy" aria-label="Copy Easing token CSS" data-copy-key="tok-easing">
-          <svg class="icon-copy" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-          </svg>
-          <svg class="icon-check" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        </button>
-      </article>
-
-      <!-- 3. Distance -->
-      <article class="card" data-proto-card>
-        <div class="card-stage">
-<svg class="token-illu" role="img" aria-hidden="true" overflow="visible" width="188.591" height="57.261" viewBox="0 0 188.591 57.261" fill="none" xmlns="http://www.w3.org/2000/svg"><g><path d="M186.463 0.517899C186.335 0.124056 185.912 -0.0912114 185.518 0.037086L179.1 2.12781C178.706 2.25611 178.491 2.67939 178.619 3.07323C178.747 3.46708 179.17 3.68234 179.564 3.55405L185.269 1.69562L187.128 7.40056C187.256 7.7944 187.679 8.00967 188.073 7.88137C188.467 7.75307 188.682 7.32979 188.554 6.93595L186.463 0.517899ZM15.2401 40.1025C15.4662 39.7555 15.3682 39.2908 15.0211 39.0647C14.674 38.8386 14.2094 38.9367 13.9833 39.2838L14.6117 39.6931L15.2401 40.1025ZM16.8597 34.9851C16.625 35.3263 16.7113 35.7933 17.0526 36.028C17.3938 36.2628 17.8608 36.1765 18.0955 35.8352L17.4776 35.4101L16.8597 34.9851ZM18.8016 34.8162C19.0386 34.4765 18.9554 34.009 18.6157 33.7719C18.276 33.5349 17.8085 33.6181 17.5715 33.9578L18.1865 34.387L18.8016 34.8162ZM20.3893 30.0348C20.1429 30.3678 20.213 30.8374 20.5459 31.0839C20.8789 31.3303 21.3485 31.2602 21.595 30.9273L20.9922 30.4811L20.3893 30.0348ZM22.3293 29.9433C22.5783 29.6124 22.5119 29.1421 22.1809 28.8931C21.85 28.6441 21.3797 28.7105 21.1307 29.0415L21.73 29.4924L22.3293 29.9433ZM24.3092 24.9683C24.0484 25.2901 24.0977 25.7624 24.4195 26.0233C24.7413 26.2841 25.2136 26.2347 25.4744 25.913L24.8918 25.4406L24.3092 24.9683ZM26.2508 24.9645C26.5147 24.6453 26.4699 24.1725 26.1507 23.9086C25.8314 23.6447 25.3587 23.6895 25.0947 24.0088L25.6728 24.4866L26.2508 24.9645ZM28.2819 20.3102C28.0048 20.618 28.0297 21.0923 28.3376 21.3694C28.6454 21.6465 29.1196 21.6216 29.3968 21.3137L28.8393 20.8119L28.2819 20.3102ZM30.2719 20.3536C30.5529 20.0492 30.5339 19.5747 30.2296 19.2938C29.9253 19.0128 29.4508 19.0317 29.1698 19.3361L29.7208 19.8448L30.2719 20.3536ZM32.6766 15.7326C32.3795 16.0213 32.3727 16.4961 32.6613 16.7932C32.9499 17.0903 33.4248 17.0971 33.7219 16.8085L33.1992 16.2706L32.6766 15.7326ZM34.5718 15.9946C34.8731 15.7103 34.8869 15.2357 34.6026 14.9344C34.3183 14.6331 33.8437 14.6193 33.5424 14.9036L34.0571 15.4491L34.5718 15.9946ZM37.3746 11.527C37.054 11.7893 37.0068 12.2618 37.2691 12.5824C37.5314 12.903 38.0039 12.9502 38.3245 12.6879L37.8495 12.1075L37.3746 11.527ZM39.2762 11.9245C39.6019 11.6685 39.6584 11.197 39.4024 10.8714C39.1465 10.5457 38.675 10.4892 38.3493 10.7452L38.8127 11.3348L39.2762 11.9245ZM42.4163 7.82486C42.069 8.05054 41.9703 8.51506 42.196 8.8624C42.4217 9.20973 42.8862 9.30836 43.2335 9.08268L42.8249 8.45377L42.4163 7.82486ZM44.2879 8.41698C44.6411 8.20052 44.7519 7.73876 44.5354 7.3856C44.319 7.03245 43.8572 6.92164 43.5041 7.1381L43.896 7.77754L44.2879 8.41698ZM47.9093 4.76823C47.5334 4.94218 47.3697 5.38793 47.5436 5.76385C47.7175 6.13977 48.1633 6.30351 48.5392 6.12957L48.2243 5.4489L47.9093 4.76823ZM49.6825 5.62388C50.0642 5.46288 50.243 5.02297 50.082 4.64133C49.921 4.25969 49.4811 4.08083 49.0995 4.24184L49.391 4.93286L49.6825 5.62388ZM53.8742 2.61947C53.4731 2.72281 53.2317 3.13175 53.3351 3.53286C53.4384 3.93398 53.8473 4.17538 54.2484 4.07204L54.0613 3.34575L53.8742 2.61947ZM55.4492 3.78872C55.8542 3.70194 56.1122 3.30325 56.0254 2.89823C55.9386 2.49321 55.54 2.23523 55.1349 2.32201L55.2921 3.05537L55.4492 3.78872ZM60.169 1.67772C59.7552 1.69512 59.4338 2.04471 59.4512 2.45856C59.4686 2.8724 59.8182 3.19379 60.232 3.1764L60.2005 2.42706L60.169 1.67772ZM61.4483 3.15173C61.8625 3.15232 62.1988 2.81701 62.1994 2.40279C62.1999 1.98858 61.8646 1.65232 61.4504 1.65173L61.4494 2.40173L61.4483 3.15173ZM66.5134 2.08864C66.105 2.01909 65.7177 2.29373 65.6481 2.70206C65.5786 3.1104 65.8532 3.4978 66.2615 3.56734L66.3875 2.82799L66.5134 2.08864ZM67.455 3.79505C67.8603 3.88063 68.2582 3.62147 68.3438 3.21619C68.4294 2.81091 68.1702 2.413 67.7649 2.32741L67.61 3.06123L67.455 3.79505ZM72.6368 3.73507C72.2477 3.59296 71.8171 3.79316 71.675 4.18223C71.5329 4.57131 71.7331 5.00192 72.1221 5.14403L72.3795 4.43955L72.6368 3.73507ZM73.2676 5.58321C73.652 5.73751 74.0887 5.55099 74.243 5.16659C74.3973 4.78219 74.2108 4.34548 73.8264 4.19118L73.547 4.88719L73.2676 5.58321ZM78.4002 6.33381C78.0347 6.13884 77.5804 6.27705 77.3855 6.6425C77.1905 7.00796 77.3287 7.46228 77.6941 7.65725L78.0472 6.99553L78.4002 6.33381ZM78.7814 8.25389C79.1423 8.45732 79.5997 8.32974 79.8031 7.96893C80.0065 7.60811 79.879 7.1507 79.5181 6.94726L79.1498 7.60057L78.7814 8.25389ZM83.7932 9.59224C83.4493 9.36141 82.9834 9.4531 82.7525 9.79703C82.5217 10.141 82.6134 10.6069 82.9573 10.8377L83.3753 10.215L83.7932 9.59224ZM83.988 11.5419C84.3281 11.7784 84.7955 11.6943 85.0319 11.3542C85.2683 11.0141 85.1843 10.5467 84.8442 10.3103L84.4161 10.9261L83.988 11.5419ZM88.8736 13.2828C88.5466 13.0286 88.0754 13.0876 87.8212 13.4146C87.567 13.7416 87.6259 14.2128 87.9529 14.467L88.4133 13.8749L88.8736 13.2828ZM88.9314 15.2365C89.2556 15.4943 89.7274 15.4405 89.9852 15.1162C90.243 14.792 90.1892 14.3202 89.865 14.0624L89.3982 14.6495L88.9314 15.2365ZM93.7207 17.2453C93.4056 16.9765 92.9322 17.0141 92.6634 17.3293C92.3946 17.6444 92.4322 18.1178 92.7473 18.3866L93.234 17.816L93.7207 17.2453ZM93.6914 19.1973C94.0048 19.4681 94.4784 19.4337 94.7492 19.1203C95.0201 18.8069 94.9856 18.3333 94.6723 18.0624L94.1818 18.6298L93.6914 19.1973ZM98.4144 21.3652C98.1061 21.0885 97.632 21.114 97.3553 21.4223C97.0786 21.7305 97.1041 22.2047 97.4123 22.4814L97.9134 21.9233L98.4144 21.3652ZM98.3376 23.3146C98.6451 23.5922 99.1193 23.568 99.3969 23.2606C99.6745 22.9532 99.6504 22.4789 99.3429 22.2013L98.8403 22.7579L98.3376 23.3146ZM103.03 25.5529C102.724 25.2738 102.249 25.2957 101.97 25.6018C101.691 25.9079 101.713 26.3822 102.019 26.6613L102.525 26.1071L103.03 25.5529ZM102.94 27.5006C103.246 27.7795 103.721 27.7574 104 27.4512C104.279 27.1449 104.256 26.6706 103.95 26.3917L103.445 26.9461L102.94 27.5006ZM107.639 29.7275C107.331 29.4514 106.856 29.4779 106.58 29.7866C106.304 30.0954 106.331 30.5695 106.639 30.8457L107.139 30.2866L107.639 29.7275ZM107.571 31.6756C107.881 31.9504 108.355 31.922 108.63 31.6121C108.905 31.3022 108.876 30.8282 108.566 30.5533L108.069 31.1145L107.571 31.6756ZM112.315 33.8031C111.998 33.536 111.525 33.5762 111.258 33.8928C110.991 34.2094 111.031 34.6826 111.348 34.9497L111.831 34.3764L112.315 33.8031ZM112.31 35.7544C112.629 36.0188 113.101 35.9747 113.366 35.6558C113.63 35.337 113.586 34.8642 113.267 34.5998L112.788 35.1771L112.31 35.7544ZM117.133 37.6732C116.802 37.4232 116.332 37.4881 116.082 37.8183C115.832 38.1485 115.897 38.6189 116.227 38.869L116.68 38.2711L117.133 37.6732ZM117.245 39.6287C117.578 39.8741 118.048 39.8025 118.293 39.4688C118.539 39.1351 118.467 38.6656 118.133 38.4202L117.689 39.0245L117.245 39.6287ZM122.187 41.1996C121.837 40.9783 121.374 41.0827 121.153 41.4328C120.931 41.7829 121.036 42.2462 121.386 42.4675L121.787 41.8335L122.187 41.1996ZM122.476 43.1397C122.831 43.3533 123.291 43.2386 123.505 42.8837C123.718 42.5288 123.604 42.0679 123.249 41.8544L122.862 42.4971L122.476 43.1397ZM127.562 44.1599C127.187 43.9856 126.741 44.149 126.566 44.5247C126.392 44.9005 126.556 45.3464 126.931 45.5207L127.247 44.8403L127.562 44.1599ZM128.098 46.0391C128.479 46.201 128.92 46.0232 129.082 45.6419C129.243 45.2607 129.066 44.8204 128.684 44.6585L128.391 45.3488L128.098 46.0391ZM133.276 46.2185C132.874 46.1174 132.466 46.3611 132.365 46.7627C132.264 47.1644 132.508 47.572 132.91 47.6731L133.093 46.9458L133.276 46.2185ZM134.153 47.9568C134.559 48.0398 134.955 47.7781 135.038 47.3722C135.121 46.9664 134.859 46.5702 134.454 46.4872L134.303 47.222L134.153 47.9568ZM139.238 46.9881C138.823 46.987 138.487 47.3219 138.486 47.7361C138.485 48.1503 138.82 48.487 139.234 48.4881L139.236 47.7381L139.238 46.9881ZM140.527 48.4571C140.941 48.4361 141.259 48.0838 141.238 47.6701C141.217 47.2564 140.865 46.938 140.451 46.959L140.489 47.708L140.527 48.4571ZM145.21 46.2117C144.809 46.3177 144.57 46.7282 144.676 47.1286C144.782 47.529 145.193 47.7678 145.593 47.6618L145.401 46.9368L145.21 46.2117ZM146.789 47.3146C147.184 47.1898 147.403 46.7684 147.278 46.3735C147.153 45.9785 146.732 45.7596 146.337 45.8844L146.563 46.5995L146.789 47.3146ZM150.822 44.0054C150.454 44.1971 150.312 44.6501 150.504 45.0173C150.695 45.3845 151.149 45.5268 151.516 45.3351L151.169 44.6702L150.822 44.0054ZM152.585 44.7518C152.945 44.5469 153.071 44.089 152.866 43.729C152.661 43.369 152.203 43.2432 151.843 43.4481L152.214 44.0999L152.585 44.7518ZM155.957 40.719C155.627 40.9691 155.562 41.4395 155.812 41.7697C156.062 42.0999 156.533 42.1649 156.863 41.9148L156.41 41.3169L155.957 40.719ZM157.808 41.1796C158.131 40.9211 158.184 40.4491 157.926 40.1255C157.667 39.8019 157.195 39.7491 156.872 40.0076L157.34 40.5936L157.808 41.1796ZM160.591 36.725C160.293 37.0127 160.284 37.4876 160.572 37.7855C160.86 38.0834 161.335 38.0915 161.633 37.8038L161.112 37.2644L160.591 36.725ZM162.532 36.9173C162.824 36.6236 162.823 36.1487 162.529 35.8566C162.236 35.5645 161.761 35.5657 161.469 35.8593L162.001 36.3883L162.532 36.9173ZM164.747 32.327C164.475 32.6395 164.508 33.1132 164.821 33.3851C165.133 33.657 165.607 33.6241 165.879 33.3117L165.313 32.8193L164.747 32.327ZM166.725 32.3236C166.992 32.007 166.952 31.5339 166.636 31.2668C166.319 30.9997 165.846 31.0398 165.579 31.3564L166.152 31.84L166.725 32.3236ZM168.626 27.5444C168.376 27.8742 168.44 28.3447 168.77 28.5954C169.1 28.846 169.57 28.7818 169.821 28.4521L169.224 27.9982L168.626 27.5444ZM170.56 27.4675C170.807 27.135 170.738 26.6652 170.405 26.4182C170.073 26.1713 169.603 26.2407 169.356 26.5732L169.958 27.0204L170.56 27.4675ZM172.311 22.4114C172.078 22.7539 172.167 23.2204 172.509 23.4534C172.852 23.6865 173.318 23.5977 173.551 23.2553L172.931 22.8334L172.311 22.4114ZM174.241 22.2322C174.471 21.8877 174.378 21.422 174.034 21.192C173.689 20.962 173.223 21.0548 172.993 21.3993L173.617 21.8157L174.241 22.2322ZM175.591 17.3718C175.372 17.7233 175.479 18.1859 175.83 18.4052C176.182 18.6244 176.644 18.5173 176.864 18.1659L176.227 17.7688L175.591 17.3718ZM177.526 17.0958C177.743 16.7428 177.632 16.2809 177.279 16.0642C176.926 15.8475 176.464 15.958 176.248 16.311L176.887 16.7034L177.526 17.0958ZM178.876 11.8923C178.669 12.251 178.792 12.7097 179.151 12.9168C179.51 13.1239 179.968 13.001 180.176 12.6422L179.526 12.2673L178.876 11.8923ZM180.76 11.6233C180.965 11.2634 180.84 10.8054 180.48 10.6003C180.12 10.3952 179.662 10.5207 179.457 10.8806L180.108 11.2519L180.76 11.6233ZM181.8 6.66338C181.603 7.02751 181.738 7.48275 182.102 7.68019C182.466 7.87763 182.921 7.74249 183.119 7.37836L182.459 7.02087L181.8 6.66338ZM183.714 6.2743C183.909 5.90918 183.772 5.45462 183.407 5.25901C183.042 5.0634 182.587 5.20082 182.392 5.56593L183.053 5.92011L183.714 6.2743ZM184.78 1.00077C184.592 1.36955 184.738 1.82141 185.107 2.01002C185.475 2.19863 185.927 2.05257 186.116 1.68379L185.448 1.34228L184.78 1.00077ZM14.25 40.2502L14.8796 40.6577C14.9999 40.4718 15.1201 40.2868 15.2401 40.1025L14.6117 39.6931L13.9833 39.2838C13.8624 39.4693 13.7415 39.6556 13.6204 39.8427L14.25 40.2502ZM17.4776 35.4101L18.0955 35.8352C18.3314 35.4924 18.5668 35.1527 18.8016 34.8162L18.1865 34.387L17.5715 33.9578C17.3347 34.2971 17.0975 34.6395 16.8597 34.9851L17.4776 35.4101ZM20.9922 30.4811L21.595 30.9273C21.8403 30.5959 22.0851 30.2679 22.3293 29.9433L21.73 29.4924L21.1307 29.0415C20.8841 29.3692 20.637 29.7003 20.3893 30.0348L20.9922 30.4811ZM24.8918 25.4406L25.4744 25.913C25.7339 25.5929 25.9927 25.2768 26.2508 24.9645L25.6728 24.4866L25.0947 24.0088C24.8335 24.3248 24.5717 24.6446 24.3092 24.9683L24.8918 25.4406ZM28.8393 20.8119L29.3968 21.3137C29.6893 20.9886 29.981 20.6686 30.2719 20.3536L29.7208 19.8448L29.1698 19.3361C28.8746 19.6558 28.5786 19.9805 28.2819 20.3102L28.8393 20.8119ZM33.1992 16.2706L33.7219 16.8085C34.006 16.5325 34.2893 16.2612 34.5718 15.9946L34.0571 15.4491L33.5424 14.9036C33.2545 15.1752 32.9659 15.4516 32.6766 15.7326L33.1992 16.2706ZM37.8495 12.1075L38.3245 12.6879C38.6428 12.4274 38.96 12.173 39.2762 11.9245L38.8127 11.3348L38.3493 10.7452C38.0253 10.9998 37.7004 11.2604 37.3746 11.527L37.8495 12.1075ZM42.8249 8.45377L43.2335 9.08268C43.5864 8.85344 43.9378 8.63158 44.2879 8.41698L43.896 7.77754L43.5041 7.1381C43.1425 7.35968 42.78 7.58857 42.4163 7.82486L42.8249 8.45377ZM48.2243 5.4489L48.5392 6.12957C48.9219 5.95249 49.303 5.78399 49.6825 5.62388L49.391 4.93286L49.0995 4.24184C48.704 4.40866 48.3073 4.58408 47.9093 4.76823L48.2243 5.4489ZM54.0613 3.34575L54.2484 4.07204C54.6504 3.96849 55.0506 3.87412 55.4492 3.78872L55.2921 3.05537L55.1349 2.32201C54.7162 2.41174 54.2959 2.51082 53.8742 2.61947L54.0613 3.34575ZM60.2005 2.42706L60.232 3.1764C60.639 3.1593 61.0444 3.15116 61.4483 3.15173L61.4494 2.40173L61.4504 1.65173C61.0249 1.65113 60.5978 1.65971 60.169 1.67772L60.2005 2.42706ZM66.3875 2.82799L66.2615 3.56734C66.6606 3.63532 67.0584 3.7113 67.455 3.79505L67.61 3.06123L67.7649 2.32741C67.3494 2.23966 66.9322 2.15997 66.5134 2.08864L66.3875 2.82799ZM72.3795 4.43955L72.1221 5.14403C72.505 5.28386 72.8868 5.43033 73.2676 5.58321L73.547 4.88719L73.8264 4.19118C73.4313 4.03257 73.0348 3.88044 72.6368 3.73507L72.3795 4.43955ZM78.0472 6.99553L77.6941 7.65725C78.0574 7.85103 78.4198 8.04998 78.7814 8.25389L79.1498 7.60057L79.5181 6.94726C79.1467 6.73781 78.774 6.53324 78.4002 6.33381L78.0472 6.99553ZM83.3753 10.215L82.9573 10.8377C83.3015 11.0687 83.6451 11.3035 83.988 11.5419L84.4161 10.9261L84.8442 10.3103C84.4948 10.0674 84.1445 9.82796 83.7932 9.59224L83.3753 10.215ZM88.4133 13.8749L87.9529 14.467C88.2796 14.721 88.6057 14.9775 88.9314 15.2365L89.3982 14.6495L89.865 14.0624C89.5352 13.8002 89.2048 13.5403 88.8736 13.2828L88.4133 13.8749ZM93.234 17.816L92.7473 18.3866C93.0624 18.6553 93.377 18.9256 93.6914 19.1973L94.1818 18.6298L94.6723 18.0624C94.3556 17.7887 94.0384 17.5163 93.7207 17.2453L93.234 17.816ZM97.9134 21.9233L97.4123 22.4814C97.721 22.7585 98.0294 23.0363 98.3376 23.3146L98.8403 22.7579L99.3429 22.2013C99.0338 21.9221 98.7243 21.6434 98.4144 21.3652L97.9134 21.9233ZM102.525 26.1071L102.019 26.6613C102.326 26.9413 102.633 27.2211 102.94 27.5006L103.445 26.9461L103.95 26.3917C103.644 26.1124 103.337 25.8328 103.03 25.5529L102.525 26.1071ZM107.139 30.2866L106.639 30.8457C106.95 31.1234 107.261 31.4001 107.571 31.6756L108.069 31.1145L108.566 30.5533C108.258 30.2793 107.948 30.004 107.639 29.7275L107.139 30.2866ZM111.831 34.3764L111.348 34.9497C111.668 35.22 111.989 35.4883 112.31 35.7544L112.788 35.1771L113.267 34.5998C112.95 34.3365 112.632 34.0709 112.315 33.8031L111.831 34.3764ZM116.68 38.2711L116.227 38.869C116.566 39.1256 116.905 39.379 117.245 39.6287L117.689 39.0245L118.133 38.4202C117.8 38.1749 117.466 37.9258 117.133 37.6732L116.68 38.2711ZM121.787 41.8335L121.386 42.4675C121.749 42.6967 122.112 42.9208 122.476 43.1397L122.862 42.4971L123.249 41.8544C122.895 41.6414 122.541 41.4231 122.187 41.1996L121.787 41.8335ZM127.247 44.8403L126.931 45.5207C127.319 45.7006 127.708 45.8735 128.098 46.0391L128.391 45.3488L128.684 44.6585C128.31 44.4995 127.936 44.3332 127.562 44.1599L127.247 44.8403ZM133.093 46.9458L132.91 47.6731C133.323 47.7771 133.737 47.8718 134.153 47.9568L134.303 47.222L134.454 46.4872C134.06 46.4068 133.668 46.3171 133.276 46.2185L133.093 46.9458ZM139.236 47.7381L139.234 48.4881C139.663 48.4892 140.095 48.479 140.527 48.4571L140.489 47.708L140.451 46.959C140.045 46.9795 139.641 46.9891 139.238 46.9881L139.236 47.7381ZM145.401 46.9368L145.593 47.6618C145.991 47.5566 146.389 47.441 146.789 47.3146L146.563 46.5995L146.337 45.8844C145.96 46.0036 145.584 46.1127 145.21 46.2117L145.401 46.9368ZM151.169 44.6702L151.516 45.3351C151.871 45.1494 152.228 44.9551 152.585 44.7518L152.214 44.0999L151.843 43.4481C151.501 43.6426 151.161 43.8283 150.822 44.0054L151.169 44.6702ZM156.41 41.3169L156.863 41.9148C157.177 41.6768 157.492 41.4318 157.808 41.1796L157.34 40.5936L156.872 40.0076C156.566 40.2519 156.261 40.489 155.957 40.719L156.41 41.3169ZM161.112 37.2644L161.633 37.8038C161.932 37.5148 162.232 37.2193 162.532 36.9173L162.001 36.3883L161.469 35.8593C161.175 36.1545 160.882 36.443 160.591 36.725L161.112 37.2644ZM165.313 32.8193L165.879 33.3117C166.16 32.9882 166.443 32.6589 166.725 32.3236L166.152 31.84L165.579 31.3564C165.301 31.6859 165.024 32.0094 164.747 32.327L165.313 32.8193ZM169.224 27.9982L169.821 28.4521C170.067 28.1284 170.313 27.8002 170.56 27.4675L169.958 27.0204L169.356 26.5732C169.112 26.9015 168.869 27.2252 168.626 27.5444L169.224 27.9982ZM172.931 22.8334L173.551 23.2553C173.781 22.9182 174.01 22.5772 174.241 22.2322L173.617 21.8157L172.993 21.3993C172.765 21.7406 172.538 22.078 172.311 22.4114L172.931 22.8334ZM176.227 17.7688L176.864 18.1659C177.084 17.8128 177.305 17.4561 177.526 17.0958L176.887 16.7034L176.248 16.311C176.028 16.6682 175.809 17.0219 175.591 17.3718L176.227 17.7688ZM179.526 12.2673L180.176 12.6422C180.37 12.3054 180.565 11.9657 180.76 11.6233L180.108 11.2519L179.457 10.8806C179.263 11.2206 179.07 11.5579 178.876 11.8923L179.526 12.2673ZM182.459 7.02087L183.119 7.37836C183.317 7.01322 183.515 6.6452 183.714 6.2743L183.053 5.92011L182.392 5.56593C182.194 5.93465 181.997 6.30046 181.8 6.66338L182.459 7.02087ZM185.448 1.34228L186.116 1.68379C186.217 1.48666 186.318 1.2888 186.419 1.09019L185.75 0.750203L185.081 0.410216C184.981 0.607813 184.881 0.804664 184.78 1.00077L185.448 1.34228Z" fill="var(--n-mid)"/><path d="M8.56691 56.511C12.8841 56.511 16.3838 53.0112 16.3838 48.6941C16.3838 44.3769 12.8841 40.8772 8.56691 40.8772C4.24975 40.8772 0.75 44.3769 0.75 48.6941C0.75 53.0112 4.24975 56.511 8.56691 56.511Z" stroke="var(--n-strong)" stroke-width="1.5"/></g></svg>
-        </div>
-        <div class="card-meta">
-          <div class="card-title">Distance</div>
-          <div class="card-subtitle">How far elements travel</div>
-        </div>
-        <button type="button" class="card-copy" aria-label="Copy Distance token CSS" data-copy-key="tok-distance">
-          <svg class="icon-copy" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-          </svg>
-          <svg class="icon-check" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        </button>
-      </article>
-
-      <!-- 4. Blur -->
-      <article class="card" data-proto-card>
-        <div class="card-stage">
-<svg class="token-illu" role="img" aria-hidden="true" overflow="visible" width="107.336" height="109.678" viewBox="0 0 107.336 109.678" fill="none" xmlns="http://www.w3.org/2000/svg"><g><path d="M42.3555 6.47084C43.9353 6.47084 45.216 5.19019 45.216 3.61042C45.216 2.03065 43.9353 0.75 42.3555 0.75C40.7758 0.75 39.4951 2.03065 39.4951 3.61042C39.4951 5.19019 40.7758 6.47084 42.3555 6.47084Z" stroke="var(--n-faint)" stroke-width="1.5"/><path d="M64.9796 6.47084C66.5593 6.47084 67.84 5.19019 67.84 3.61042C67.84 2.03065 66.5593 0.75 64.9796 0.75C63.3998 0.75 62.1191 2.03065 62.1191 3.61042C62.1191 5.19019 63.3998 6.47084 64.9796 6.47084Z" stroke="var(--n-faint)" stroke-width="1.5"/><path d="M20.2528 27.5329C23.2687 27.5329 25.7136 25.088 25.7136 22.0721C25.7136 19.0562 23.2687 16.6113 20.2528 16.6113C17.2369 16.6113 14.792 19.0562 14.792 22.0721C14.792 25.088 17.2369 27.5329 20.2528 27.5329Z" stroke="var(--n-faint)" stroke-width="1.5"/><path d="M42.3563 27.5329C45.3722 27.5329 47.8171 25.088 47.8171 22.0721C47.8171 19.0562 45.3722 16.6113 42.3563 16.6113C39.3404 16.6113 36.8955 19.0562 36.8955 22.0721C36.8955 25.088 39.3404 27.5329 42.3563 27.5329Z" stroke="var(--n-faint)" stroke-width="1.5"/><path d="M64.9794 27.5329C67.9953 27.5329 70.4402 25.088 70.4402 22.0721C70.4402 19.0562 67.9953 16.6113 64.9794 16.6113C61.9634 16.6113 59.5186 19.0562 59.5186 22.0721C59.5186 25.088 61.9634 27.5329 64.9794 27.5329Z" stroke="var(--n-faint)" stroke-width="1.5"/><path d="M87.0829 27.5329C90.0988 27.5329 92.5437 25.088 92.5437 22.0721C92.5437 19.0562 90.0988 16.6113 87.0829 16.6113C84.067 16.6113 81.6221 19.0562 81.6221 22.0721C81.6221 25.088 84.067 27.5329 87.0829 27.5329Z" stroke="var(--n-faint)" stroke-width="1.5"/><path d="M3.61042 47.8165C5.19019 47.8165 6.47084 46.5359 6.47084 44.9561C6.47084 43.3764 5.19019 42.0957 3.61042 42.0957C2.03065 42.0957 0.75 43.3764 0.75 44.9561C0.75 46.5359 2.03065 47.8165 3.61042 47.8165Z" stroke="var(--n-faint)" stroke-width="1.5"/><path d="M20.2528 50.4177C23.2687 50.4177 25.7136 47.9728 25.7136 44.9569C25.7136 41.941 23.2687 39.4961 20.2528 39.4961C17.2369 39.4961 14.792 41.941 14.792 44.9569C14.792 47.9728 17.2369 50.4177 20.2528 50.4177Z" stroke="var(--n-faint)" stroke-width="1.5"/><path d="M42.3561 53.0169C46.8082 53.0169 50.4173 49.4078 50.4173 44.9557C50.4173 40.5036 46.8082 36.8945 42.3561 36.8945C37.904 36.8945 34.2949 40.5036 34.2949 44.9557C34.2949 49.4078 37.904 53.0169 42.3561 53.0169Z" stroke="var(--n-strong)" stroke-width="1.5"/><path d="M64.9792 53.0169C69.4312 53.0169 73.0403 49.4078 73.0403 44.9557C73.0403 40.5036 69.4312 36.8945 64.9792 36.8945C60.5271 36.8945 56.918 40.5036 56.918 44.9557C56.918 49.4078 60.5271 53.0169 64.9792 53.0169Z" stroke="var(--n-strong)" stroke-width="1.5"/><path d="M87.0827 50.4176C90.0987 50.4176 92.5435 47.9727 92.5435 44.9567C92.5435 41.9408 90.0987 39.4959 87.0827 39.4959C84.0668 39.4959 81.6219 41.9408 81.6219 44.9567C81.6219 47.9727 84.0668 50.4176 87.0827 50.4176Z" stroke="var(--n-faint)" stroke-width="1.5"/><path d="M103.726 47.8165C105.305 47.8165 106.586 46.5359 106.586 44.9561C106.586 43.3764 105.305 42.0957 103.726 42.0957C102.146 42.0957 100.865 43.3764 100.865 44.9561C100.865 46.5359 102.146 47.8165 103.726 47.8165Z" stroke="var(--n-faint)" stroke-width="1.5"/><path d="M3.61042 69.922C5.19019 69.922 6.47084 68.6414 6.47084 67.0616C6.47084 65.4818 5.19019 64.2012 3.61042 64.2012C2.03065 64.2012 0.75 65.4818 0.75 67.0616C0.75 68.6414 2.03065 69.922 3.61042 69.922Z" stroke="var(--n-faint)" stroke-width="1.5"/><path d="M20.2528 72.5212C23.2687 72.5212 25.7136 70.0763 25.7136 67.0604C25.7136 64.0445 23.2687 61.5996 20.2528 61.5996C17.2369 61.5996 14.792 64.0445 14.792 67.0604C14.792 70.0763 17.2369 72.5212 20.2528 72.5212Z" stroke="var(--n-faint)" stroke-width="1.5"/><path d="M42.3561 75.1224C46.8082 75.1224 50.4173 71.5133 50.4173 67.0612C50.4173 62.6091 46.8082 59 42.3561 59C37.904 59 34.2949 62.6091 34.2949 67.0612C34.2949 71.5133 37.904 75.1224 42.3561 75.1224Z" stroke="var(--n-strong)" stroke-width="1.5"/><path d="M64.9792 75.1224C69.4312 75.1224 73.0403 71.5133 73.0403 67.0612C73.0403 62.6091 69.4312 59 64.9792 59C60.5271 59 56.918 62.6091 56.918 67.0612C56.918 71.5133 60.5271 75.1224 64.9792 75.1224Z" stroke="var(--n-strong)" stroke-width="1.5"/><path d="M87.0827 72.5212C90.0987 72.5212 92.5435 70.0763 92.5435 67.0604C92.5435 64.0444 90.0987 61.5996 87.0827 61.5996C84.0668 61.5996 81.6219 64.0444 81.6219 67.0604C81.6219 70.0763 84.0668 72.5212 87.0827 72.5212Z" stroke="var(--n-faint)" stroke-width="1.5"/><path d="M103.726 69.922C105.305 69.922 106.586 68.6414 106.586 67.0616C106.586 65.4818 105.305 64.2012 103.726 64.2012C102.146 64.2012 100.865 65.4818 100.865 67.0616C100.865 68.6414 102.146 69.922 103.726 69.922Z" stroke="var(--n-faint)" stroke-width="1.5"/><path d="M20.2528 94.6247C23.2687 94.6247 25.7136 92.1798 25.7136 89.1639C25.7136 86.148 23.2687 83.7031 20.2528 83.7031C17.2369 83.7031 14.792 86.148 14.792 89.1639C14.792 92.1798 17.2369 94.6247 20.2528 94.6247Z" stroke="var(--n-faint)" stroke-width="1.5"/><path d="M42.3563 94.6247C45.3722 94.6247 47.8171 92.1798 47.8171 89.1639C47.8171 86.148 45.3722 83.7031 42.3563 83.7031C39.3404 83.7031 36.8955 86.148 36.8955 89.1639C36.8955 92.1798 39.3404 94.6247 42.3563 94.6247Z" stroke="var(--n-faint)" stroke-width="1.5"/><path d="M64.9791 94.6248C67.995 94.6248 70.4399 92.1799 70.4399 89.164C70.4399 86.1481 67.995 83.7032 64.9791 83.7032C61.9632 83.7032 59.5183 86.1481 59.5183 89.164C59.5183 92.1799 61.9632 94.6248 64.9791 94.6248Z" stroke="var(--n-faint)" stroke-width="1.5"/><path d="M87.0827 94.6248C90.0987 94.6248 92.5435 92.1799 92.5435 89.164C92.5435 86.1481 90.0987 83.7032 87.0827 83.7032C84.0668 83.7032 81.6219 86.1481 81.6219 89.164C81.6219 92.1799 84.0668 94.6248 87.0827 94.6248Z" stroke="var(--n-mid)" stroke-width="1.5"/><path d="M42.3555 108.928C43.9353 108.928 45.216 107.647 45.216 106.067C45.216 104.488 43.9353 103.207 42.3555 103.207C40.7758 103.207 39.4951 104.488 39.4951 106.067C39.4951 107.647 40.7758 108.928 42.3555 108.928Z" stroke="var(--n-faint)" stroke-width="1.5"/><path d="M64.9796 108.928C66.5593 108.928 67.84 107.647 67.84 106.067C67.84 104.488 66.5593 103.207 64.9796 103.207C63.3998 103.207 62.1191 104.488 62.1191 106.067C62.1191 107.647 63.3998 108.928 64.9796 108.928Z" stroke="var(--n-faint)" stroke-width="1.5"/></g></svg>
-        </div>
-        <div class="card-meta">
-          <div class="card-title">Blur</div>
-          <div class="card-subtitle">Motion blur during movement</div>
-        </div>
-        <button type="button" class="card-copy" aria-label="Copy Blur token CSS" data-copy-key="tok-blur">
-          <svg class="icon-copy" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-          </svg>
-          <svg class="icon-check" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        </button>
-      </article>
-
-      <!-- 5. Scale -->
-      <article class="card" data-proto-card>
-        <div class="card-stage">
-<svg class="token-illu" role="img" aria-hidden="true" overflow="visible" width="188.5" height="58.7794" viewBox="0 0 188.5 58.7794" fill="none" xmlns="http://www.w3.org/2000/svg"><g><path d="M4.11937 32.7583C5.98023 32.7583 7.48875 31.2498 7.48875 29.3889C7.48875 27.5281 5.98023 26.0195 4.11937 26.0195C2.25852 26.0195 0.75 27.5281 0.75 29.3889C0.75 31.2498 2.25852 32.7583 4.11937 32.7583Z" stroke="var(--n-strong)" stroke-width="1.5"/><path d="M41.1831 36.8018C45.277 36.8018 48.5958 33.4831 48.5958 29.3892C48.5958 25.2953 45.277 21.9766 41.1831 21.9766C37.0893 21.9766 33.7705 25.2953 33.7705 29.3892C33.7705 33.4831 37.0893 36.8018 41.1831 36.8018Z" stroke="var(--n-strong)" stroke-width="1.5"/><path d="M88.3536 44.5529C96.7274 44.5529 103.516 37.7645 103.516 29.3907C103.516 21.0169 96.7274 14.2285 88.3536 14.2285C79.9797 14.2285 73.1914 21.0169 73.1914 29.3907C73.1914 37.7645 79.9797 44.5529 88.3536 44.5529Z" stroke="var(--n-strong)" stroke-width="1.5"/><path d="M159.11 58.0294C174.928 58.0294 187.75 45.2069 187.75 29.3897C187.75 13.5724 174.928 0.75 159.11 0.75C143.293 0.75 130.471 13.5724 130.471 29.3897C130.471 45.2069 143.293 58.0294 159.11 58.0294Z" stroke="var(--n-strong)" stroke-width="1.5"/><path d="M6.64551 25.6827L145.632 2.93945" stroke="var(--n-mid)" stroke-width="1.5" stroke-dasharray="4 6"/><path d="M7.15137 33.0957L143.948 54.9966" stroke="var(--n-mid)" stroke-width="1.5" stroke-dasharray="4 6"/></g></svg>
-        </div>
-        <div class="card-meta">
-          <div class="card-title">Scale</div>
-          <div class="card-subtitle">Size change on enter and exit</div>
-        </div>
-        <button type="button" class="card-copy" aria-label="Copy Scale token CSS" data-copy-key="tok-scale">
-          <svg class="icon-copy" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-          </svg>
-          <svg class="icon-check" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        </button>
-      </article>
-
-    </section>
-
     <!-- ─── Recommended course CTA (Figma 356:350) ───────────────
          Vertical accent bar + two-line copy + pill button. The pill's
          external-link icon has a static frame and a separate arrow
@@ -5080,12 +5288,18 @@
     </aside>
 
     <footer class="footer">
-      <span class="footer-muted">Made by</span><a
+      <span class="footer-muted">Created by</span>
+      <a
         class="footer-name"
         href="https://x.com/jakubantalik"
         target="_blank"
         rel="noopener noreferrer"
       >Jakub Antalik</a>
+      <span class="footer-muted">&middot;</span>
+      <a
+        class="footer-name"
+        href="terms.html"
+      >Terms &amp; License</a>
     </footer>
   </main>
 
@@ -8994,78 +9208,6 @@ export function Surface({ open, children }) {
         });
       })();
 
-      /* Header view switcher: Transitions ↔ Motion tokens.
-         Reuses the P16 sliding-pill logic for the indicator and also
-         toggles which card grid (.cards[data-view-panel]) is visible
-         via the `hidden` attribute, keyed off the tab's data-view. */
-      (function initViewTabs() {
-        var bar = document.querySelector("[data-view-tabs]");
-        if (!bar) return;
-        var indicator = bar.querySelector(".view-tabs-indicator");
-        var tabs = Array.prototype.slice.call(
-          bar.querySelectorAll(".view-tab")
-        );
-        if (!indicator || !tabs.length) return;
-        var panels = Array.prototype.slice.call(
-          document.querySelectorAll("[data-view-panel]")
-        );
-
-        function moveTo(tab, animate) {
-          var left = tab.offsetLeft;
-          var width = tab.offsetWidth;
-          if (!animate) {
-            var prev = indicator.style.transition;
-            indicator.style.transition = "none";
-            indicator.style.transform = "translateX(" + left + "px)";
-            indicator.style.width = width + "px";
-            // eslint-disable-next-line no-unused-expressions
-            indicator.offsetWidth;
-            indicator.style.transition = prev;
-          } else {
-            indicator.style.transform = "translateX(" + left + "px)";
-            indicator.style.width = width + "px";
-          }
-        }
-        function getActive() {
-          return tabs.find(function (t) {
-            return t.getAttribute("aria-selected") === "true";
-          }) || tabs[0];
-        }
-        function showPanel(view) {
-          panels.forEach(function (panel) {
-            panel.hidden = panel.getAttribute("data-view-panel") !== view;
-          });
-        }
-
-        tabs.forEach(function (t) {
-          t.addEventListener("click", function () {
-            tabs.forEach(function (other) {
-              other.setAttribute(
-                "aria-selected", other === t ? "true" : "false"
-              );
-            });
-            moveTo(t, true);
-            showPanel(t.getAttribute("data-view"));
-          });
-        });
-
-        // Snap to the active tab once layout settles; re-snap after the
-        // web font loads (label widths shift) and on resize.
-        window.requestAnimationFrame(function () {
-          moveTo(getActive(), false);
-        });
-        if (document.fonts && document.fonts.ready) {
-          document.fonts.ready.then(function () {
-            moveTo(getActive(), false);
-          });
-        }
-        window.addEventListener("resize", function () {
-          moveTo(getActive(), false);
-        });
-
-        showPanel(getActive().getAttribute("data-view"));
-      })();
-
       /* Build the hover tooltip for every copy button once on load.
          The tooltip reads "Cop" + a swap slot that holds both "y"
          and "ied" stacked on top of each other; toggling
@@ -9471,6 +9613,71 @@ export function Surface({ open, children }) {
           head.setAttribute("aria-expanded", open ? "false" : "true");
         });
       })();
+    })();
+  </script>
+  <script>
+    // --- Mobile menu: hamburger ↔ ✕ morph + blurred backdrop ---
+    // Open adds .menu-open (staggered reveal). Close swaps to
+    // .menu-closing for a single quiet fade, decoupled from the
+    // entrance, then clears it after the fade so the next open
+    // starts from the pre-entrance state.
+    (function initMobileMenu() {
+      var burger = document.getElementById("nav-burger");
+      var backdrop = document.getElementById("mobile-menu-backdrop");
+      var menu = document.getElementById("mobile-menu");
+      if (!burger || !backdrop || !menu) return;
+
+      var CLOSE_MS = 300;
+      var closeTimer = null;
+      var isOpen = false;
+
+      function open() {
+        if (isOpen) return;
+        isOpen = true;
+        clearTimeout(closeTimer);
+        document.body.classList.remove("menu-closing");
+        // Reflow so the pre-entrance state is committed before .menu-open
+        // flips it — guarantees the stagger replays every time.
+        void document.body.offsetHeight;
+        document.body.classList.add("menu-open");
+        burger.setAttribute("aria-expanded", "true");
+        burger.setAttribute("aria-label", "Close menu");
+      }
+
+      function close() {
+        if (!isOpen) return;
+        isOpen = false;
+        document.body.classList.remove("menu-open");
+        document.body.classList.add("menu-closing");
+        burger.setAttribute("aria-expanded", "false");
+        burger.setAttribute("aria-label", "Open menu");
+        clearTimeout(closeTimer);
+        closeTimer = setTimeout(function () {
+          document.body.classList.remove("menu-closing");
+        }, CLOSE_MS);
+      }
+
+      burger.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (isOpen) close(); else open();
+      });
+      backdrop.addEventListener("click", close);
+      menu.addEventListener("click", function (e) {
+        if (e.target.closest(".mobile-menu-link")) close();
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && isOpen) close();
+      });
+      // Leaving the mobile breakpoint hides the burger; drop any open
+      // state so desktop never inherits the locked scroll / overlay.
+      window.addEventListener("resize", function () {
+        if (isOpen && window.innerWidth > 639) {
+          document.body.classList.remove("menu-open", "menu-closing");
+          burger.setAttribute("aria-expanded", "false");
+          burger.setAttribute("aria-label", "Open menu");
+          isOpen = false;
+        }
+      });
     })();
   </script>
 </body>

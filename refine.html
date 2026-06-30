@@ -3540,8 +3540,21 @@
     }
     html[data-theme="dark"] .hero-visual {
       box-shadow:
-        0 10px 40px 0 rgba(0, 0, 0, 0.4),
-        0 0 0 1px rgba(255, 255, 255, 0.06);
+        0 10px 40px 0 rgba(0, 0, 0, 0.25),
+        0 2px 6px 0 rgba(0, 0, 0, 0.05);
+    }
+    /* Inset highlights must paint ABOVE the video (which fills the box and would
+       otherwise cover an inset box-shadow). Overlay them via a pseudo-element. */
+    html[data-theme="dark"] .hero-visual::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      z-index: 1;
+      box-shadow:
+        0 1px 0 0 rgba(255, 255, 255, 0.04) inset,
+        0 0 0 1px rgba(255, 255, 255, 0.04) inset;
     }
     .hero-visual img,
     .hero-visual video {
@@ -3908,7 +3921,7 @@
           preload="metadata"
           aria-hidden="true"
         >
-          <source src="assets/refine-web.mp4" type="video/mp4" />
+          <source src="assets/refine-web-dark.mp4" type="video/mp4" />
         </video>
       </div>
       <p class="hero-caption">Works with Cursor, Claude Code and Codex</p>
