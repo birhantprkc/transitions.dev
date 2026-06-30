@@ -3227,11 +3227,15 @@
 
     /* ─── Site nav (logo + menu + actions) ─────────────────────── */
     .site-nav {
+      position: relative;
+      z-index: 50;
       width: 100%;
     }
     .site-nav-inner {
       max-width: 1240px;
       margin: 0 auto;
+      position: relative;
+      z-index: 3;
       padding: 16px 24px;
       display: flex;
       align-items: center;
@@ -3328,6 +3332,153 @@
     .nav-pill:focus-visible {
       outline: 2px solid var(--icon-color);
       outline-offset: 2px;
+    }
+
+    /* ─── Mobile hamburger (logram-style two-line → ✕ morph) ────── */
+    /* Hidden on desktop; the media query below flips it to inline-flex
+       and hides the .site-nav-menu pills. */
+    .nav-burger { display: none; }
+    .nav-burger-box {
+      position: relative;
+      width: 16px;
+      height: 16px;
+      display: block;
+      color: var(--icon-color-muted);
+      transition: color 0.15s ease;
+    }
+    .nav-burger:hover .nav-burger-box { color: var(--icon-color); }
+    .nav-burger-line {
+      position: absolute;
+      left: 1px;
+      right: 1px;
+      height: 1.5px;
+      border-radius: 2px;
+      background: currentColor;
+      transform-origin: center;
+      /* Slide to centre (top), then rotate into the ✕. Calm ease-out. */
+      transition:
+        top 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+        transform 0.3s cubic-bezier(0.22, 1, 0.36, 1) 0.05s;
+    }
+    .nav-burger-line--top { top: 5px; }
+    .nav-burger-line--bottom { top: 9.5px; }
+    .nav-burger[aria-expanded="true"] .nav-burger-line {
+      /* Centre line of a 16px box with a 1.5px bar = (16 − 1.5)/2. */
+      top: 7.25px;
+      /* Rotate fires first on open so the lines cross as they meet. */
+      transition:
+        top 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+        transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .nav-burger[aria-expanded="true"] .nav-burger-line--top { transform: rotate(45deg); }
+    .nav-burger[aria-expanded="true"] .nav-burger-line--bottom { transform: rotate(-45deg); }
+
+    /* ─── Mobile menu overlay + blurred backdrop ───────────────── */
+    /* Backdrop: white @ 90% with a 20px blur (per design). Sits below
+       the menu list but above page content; the top bar stays clickable
+       on top of it (.site-nav-inner z-index). */
+    .mobile-menu-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      background: rgba(255, 255, 255, 0.9);
+      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(20px);
+      opacity: 0;
+      visibility: hidden;
+      transition:
+        opacity 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+        visibility 0s linear 0.35s;
+    }
+    html[data-theme="dark"] .mobile-menu-backdrop {
+      background: rgba(18, 18, 18, 0.9);
+    }
+    body.menu-open .mobile-menu-backdrop {
+      opacity: 1;
+      visibility: visible;
+      transition:
+        opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+        visibility 0s;
+    }
+    body.menu-closing .mobile-menu-backdrop {
+      opacity: 0;
+      visibility: visible;
+      transition: opacity 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .mobile-menu {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 2;
+      padding: 88px 30px 30px;
+      visibility: hidden;
+      pointer-events: none;
+      transition: visibility 0s linear 0.4s;
+    }
+    body.menu-open .mobile-menu,
+    body.menu-closing .mobile-menu {
+      visibility: visible;
+      transition: visibility 0s;
+    }
+    body.menu-open .mobile-menu { pointer-events: auto; }
+    .mobile-menu-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    .mobile-menu-link {
+      display: inline-block;
+      font-family: var(--font-sans);
+      font-size: 20px;
+      font-weight: 500;
+      line-height: 1.2;
+      letter-spacing: -0.01em;
+      color: var(--text);
+      text-decoration: none;
+      -webkit-tap-highlight-color: transparent;
+      /* Closed = pre-entrance (down + blurred + invisible). Opening
+         flips to resting; the stagger lands the eye top-to-bottom. */
+      opacity: 0;
+      transform: translateY(12px);
+      filter: blur(3px);
+      transition:
+        opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+        transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+        filter 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .mobile-menu-link--2 { transition-delay: 40ms; }
+    .mobile-menu-link--3 { transition-delay: 80ms; }
+    body.menu-open .mobile-menu-link {
+      opacity: 1;
+      transform: translateY(0);
+      filter: blur(0);
+    }
+    /* Exit decouples from the stagger: one quiet 200ms fade in place,
+       no Y-return / blur, so closing doesn't replay the reveal. */
+    body.menu-closing .mobile-menu-link {
+      opacity: 0;
+      transform: translateY(0);
+      filter: blur(0);
+      transition:
+        opacity 0.2s ease,
+        transform 0s linear,
+        filter 0s linear;
+      transition-delay: 0s;
+    }
+    body.menu-open { overflow: hidden; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .nav-burger-line,
+      .mobile-menu-backdrop,
+      .mobile-menu,
+      .mobile-menu-link {
+        transition: none !important;
+      }
     }
 
     /* ─── Hero eyebrow + visual ────────────────────────────────── */
@@ -3596,6 +3747,12 @@
       .title { font-size: 26px; line-height: 32px; }
       .subtitle { font-size: 15px; line-height: 22px; }
     }
+    @media (max-width: 639px) {
+      /* Collapse the inline nav pills into the hamburger; the GitHub
+         pill keeps its live star count (the metric people came for). */
+      .site-nav-menu { display: none; }
+      .nav-burger { display: inline-flex; }
+    }
     @media (max-width: 460px) {
       .site-nav-inner { padding: 12px 16px; gap: 8px; }
       .nav-pill { padding: 0 8px; font-size: 12px; }
@@ -3681,8 +3838,34 @@
           />
         </span>
       </button>
+      <!-- Mobile-only: morphs from two lines into an ✕, opens the
+           full-screen menu + blurred backdrop below. -->
+      <button
+        type="button"
+        class="icon-btn nav-burger"
+        id="nav-burger"
+        aria-label="Open menu"
+        aria-expanded="false"
+        aria-controls="mobile-menu"
+      >
+        <span class="nav-burger-box" aria-hidden="true">
+          <span class="nav-burger-line nav-burger-line--top"></span>
+          <span class="nav-burger-line nav-burger-line--bottom"></span>
+        </span>
+      </button>
       </div>
     </div>
+
+    <!-- Full-screen mobile menu. The backdrop is a sibling so it can
+         cover the whole viewport while the top bar stays on top. -->
+    <div class="mobile-menu-backdrop" id="mobile-menu-backdrop"></div>
+    <nav class="mobile-menu" id="mobile-menu" aria-label="Mobile">
+      <ul class="mobile-menu-list">
+        <li><a class="mobile-menu-link mobile-menu-link--1" href="/">Transitions</a></li>
+        <li><a class="mobile-menu-link mobile-menu-link--2" href="/skill.html">Skill</a></li>
+        <li><a class="mobile-menu-link mobile-menu-link--3" href="/refine.html" aria-current="page">Refine tool</a></li>
+      </ul>
+    </nav>
   </header>
 
   <main id="main" class="app">
@@ -4298,6 +4481,71 @@
           ev.preventDefault();
           target.scrollIntoView({ behavior: "smooth", block: "start" });
         });
+      });
+    })();
+  </script>
+
+  <!-- Mobile menu: hamburger ⇄ ✕ morph + full-screen overlay. On close,
+       sets .menu-closing for a single quiet fade, decoupled from the
+       entrance, then clears it after the fade so the next open starts
+       from the pre-entrance state. -->
+  <script>
+    (function initMobileMenu() {
+      var burger = document.getElementById("nav-burger");
+      var backdrop = document.getElementById("mobile-menu-backdrop");
+      var menu = document.getElementById("mobile-menu");
+      if (!burger || !backdrop || !menu) return;
+
+      var CLOSE_MS = 300;
+      var closeTimer = null;
+      var isOpen = false;
+
+      function open() {
+        if (isOpen) return;
+        isOpen = true;
+        clearTimeout(closeTimer);
+        document.body.classList.remove("menu-closing");
+        // Reflow so the pre-entrance state is committed before .menu-open
+        // flips it — guarantees the stagger replays every time.
+        void document.body.offsetHeight;
+        document.body.classList.add("menu-open");
+        burger.setAttribute("aria-expanded", "true");
+        burger.setAttribute("aria-label", "Close menu");
+      }
+
+      function close() {
+        if (!isOpen) return;
+        isOpen = false;
+        document.body.classList.remove("menu-open");
+        document.body.classList.add("menu-closing");
+        burger.setAttribute("aria-expanded", "false");
+        burger.setAttribute("aria-label", "Open menu");
+        clearTimeout(closeTimer);
+        closeTimer = setTimeout(function () {
+          document.body.classList.remove("menu-closing");
+        }, CLOSE_MS);
+      }
+
+      burger.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (isOpen) close(); else open();
+      });
+      backdrop.addEventListener("click", close);
+      menu.addEventListener("click", function (e) {
+        if (e.target.closest(".mobile-menu-link")) close();
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && isOpen) close();
+      });
+      // Leaving the mobile breakpoint hides the burger; drop any open
+      // state so desktop never inherits the locked scroll / overlay.
+      window.addEventListener("resize", function () {
+        if (isOpen && window.innerWidth > 639) {
+          document.body.classList.remove("menu-open", "menu-closing");
+          burger.setAttribute("aria-expanded", "false");
+          burger.setAttribute("aria-label", "Open menu");
+          isOpen = false;
+        }
       });
     })();
   </script>
