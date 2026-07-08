@@ -604,26 +604,48 @@
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     /* 16px left inset of the plot area (kept in sync with the ruler) */
     .tl-prop-track { position: relative; flex: 1; user-select: none; margin-left: 16px; }
-    /* timeline line — capsule (fully rounded), Figma #eeeeef default / #e9e9e9 hover */
-    .tl-bar { position: absolute; top: 50%; height: 24px; transform: translateY(-50%); background: var(--c-track);
-      border-radius: 8px; min-width: 24px; cursor: grab;
-      box-shadow: 0 1px 3px 0 rgba(0,0,0,0.08), inset 0 0 0 1px rgba(0,0,0,0.06), inset 0 -1px 0 0 rgba(0,0,0,0.1), inset 0 0 0 1px rgba(196,196,196,0.1);
-      /* card resize (transitions.dev #01): tween left/width when timing changes
-         programmatically (Apply, snap, value-field edit). Suppressed mid-drag
-         (.is-dragging) so the bar tracks the cursor 1:1. */
-      transition: background 0.12s ease,
+    /* timeline line — rubber-band drag physics. card resize tweens left/width
+       when timing changes programmatically; suppressed mid-drag (.is-dragging)
+       so the bar tracks the cursor 1:1. */
+    .tl-bar { position: absolute; top: 50%;
+      height: 24px; min-width: 24px; cursor: grab;
+      transform: translateY(-50%) skewX(var(--rb-skew,0deg)) scale(var(--rb-sx,1),var(--rb-sy,1));
+      transform-origin: var(--rb-origin,50%) 50%;
+      transition: transform 70ms linear,
         left 220ms cubic-bezier(0.22, 1, 0.36, 1),
         width 220ms cubic-bezier(0.22, 1, 0.36, 1); will-change: left, width; }
-    .tl-bar.is-dragging { transition: background 0.12s ease; }
+    .tl-bar.is-dragging { transition: transform 70ms linear; }
+    /* one-shot guard for move-mouseup: keeps left/width transition disabled
+       until the final released position has fully flushed to React state */
+    .tl-bar.no-geom-tween { transition: transform 70ms linear !important; }
+    /* keep release geometry stable: clearing rubber vars should not nudge the
+       dragged edge after mouseup, so transform resets instantly on release */
+    .tl-bar.rb-release { transition: left 220ms cubic-bezier(0.22,1,0.36,1),
+        width 220ms cubic-bezier(0.22,1,0.36,1); }
     @media (prefers-reduced-motion: reduce) {
-      .tl-bar { transition: background 0.12s ease !important; } }
-    .tl-prop-row:hover .tl-bar, .tl-prop-row.selected .tl-bar { background: var(--c-track-h); }
+      .tl-bar { transition: left 220ms cubic-bezier(0.22,1,0.36,1), width 220ms cubic-bezier(0.22,1,0.36,1) !important; } }
+    /* Bent capsule is a real SVG path: the 1px ring is a gradient stroke that
+       follows the bend exactly, the drop-shadow filter follows the painted path
+       (exact Figma shadow 580:8961), and the outline is re-synced to the bar's
+       real size by a ResizeObserver so it can never detach from the handles. */
+    .tl-bar-body { position: absolute; inset: 0; overflow: visible; pointer-events: none;
+      filter: drop-shadow(0 1px 3px rgba(0,0,0,0.08)); }
+    .tl-bar-body path { fill: var(--c-track); stroke: url(#rb-ring); stroke-width: 1;
+      transition: fill 0.12s ease; }
+    .tl-bar.rb-release .tl-bar-body path { transition: fill 0.12s ease, d 200ms cubic-bezier(0.22,1,0.36,1); }
+    .tl-prop-row:hover .tl-bar-body path, .tl-prop-row.selected .tl-bar-body path { fill: var(--c-track-h); }
     .tl-bar:active { cursor: grabbing; }
-    /* resize handles — Figma node 13044:2625: 2×14px, #767676 @60%, centered, ~5px edge inset */
-    .tl-bar-handle { position: absolute; top: 50%; transform: translateY(-50%); width: 2px; height: 14px; border-radius: 20px;
-      background: var(--c-thumb); opacity: 0; transition: opacity 0.12s ease; pointer-events: none; }
-    .tl-bar-handle.left { left: 5px; }
-    .tl-bar-handle.right { right: 5px; }
+    /* resize handles — Figma 625:1959 ")" crescent stroke on the leading edge */
+    .tl-bar-handle { position: absolute; top: 50%; width: 8px; height: 14px;
+      transform: translateY(-50%) translateX(var(--rb-hshift,0px));
+      opacity: 0; transition: opacity 0.12s ease, transform 70ms linear; pointer-events: none; z-index: 1; }
+    .tl-bar.rb-release .tl-bar-handle { transition: opacity 0.12s ease, transform 200ms cubic-bezier(0.22,1,0.36,1); }
+    .tl-bar-handle svg { display: block; width: 100%; height: 100%; overflow: visible; }
+    .tl-bar-handle path { fill: none; stroke: var(--c-thumb); stroke-width: 2; stroke-linecap: round;
+      opacity: 0.6; transition: d 70ms linear; }
+    .tl-bar.rb-release .tl-bar-handle path { transition: d 200ms cubic-bezier(0.22,1,0.36,1); }
+    .tl-bar-handle.left { left: 2px; }
+    .tl-bar-handle.right { right: 2px; }
     .tl-prop-row:hover .tl-bar-handle { opacity: 0.6; }
     .tl-bar:active .tl-bar-handle,
     .tl-bar:has(.tl-bar-grip:active) .tl-bar-handle { opacity: 1; }
@@ -1271,7 +1293,7 @@
     /* refine-type tabs — toolbar strip (Figma 587:9258): 48px white bar, hairline
        bottom divider, segments inset 16px and packed gap:0 like a segmented control */
     .tl-refine-tabs { flex: 0 0 auto; box-sizing: border-box; display: flex; align-items: center; gap: 0;
-      height: 48px; padding: 0 16px; background: #fff; border-bottom: 1px solid #f0f0f0; }
+      height: 48px; padding: 0 16px 0 10px; background: #fff; border-bottom: 1px solid #f0f0f0; }
     .tl-refine-tab { height: 32px; padding: 6px 12px; border: none; background: transparent; cursor: pointer;
       border-radius: 8px; font: inherit; font-size: 13px; font-weight: 500; line-height: 14px; color: #676767;
       transition: background 0.14s ease, color 0.14s ease; }
@@ -1418,6 +1440,39 @@
     /* scanning: cross-blur to the status face */
     .tl-scan-morph.is-scanning .tl-scan-face-label { opacity: 0; filter: blur(var(--icon-swap-blur)); transform: scale(0.98); }
     .tl-scan-morph.is-scanning .tl-scan-face-status { opacity: 1; filter: blur(0); transform: scale(1); }
+    /* exit (scan done → liquid split): pill stays put on the stage while status
+       text cross-blurs out and the chrome/beam fade so the goo blobs underneath
+       can take over without a position jump. */
+    /* The exiting pill lives inside the overlay and collapses along the SAME
+       300ms curve and box values as the blobs' vertical travel — its centered
+       label + loader ride down with the goo in perfect lockstep, and it can
+       never disagree with the blobs about height. The stage below is just a
+       spacer driving the foot's height tween. */
+    .tl-scan-morph.is-exiting { position: absolute;
+      width: auto !important; height: auto !important;
+      margin: 0; pointer-events: none; z-index: 2;
+      box-shadow: none !important; transition: none !important;
+      animation: tl-scan-pill-exit 300ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+    @keyframes tl-scan-pill-exit {
+      from { left: 4px; right: 4px; top: -41px; bottom: 24px; }
+      to   { left: 0; right: 0; top: 0; bottom: 0; } }
+    /* the goo layer owns the pill's outline (fill + shadow) during exit — the
+       exiting pill drops its own shadow and inset ring so they don't stack into
+       a doubled outline. Only its white fill (::before) lingers, cross-fading to
+       reveal the identical white blobs underneath, plus the fading text. */
+    .tl-scan-morph.is-exiting::after { opacity: 0 !important; animation: none !important; }
+    .tl-scan-morph.is-exiting .tl-scan-beam { animation: tl-scan-chrome-out var(--icon-swap-dur) var(--icon-swap-ease) forwards; }
+    /* fill drops fast (150ms) so the blobs own the surface before they start
+       visibly shrinking away from the pill's box; text follows at 250ms */
+    .tl-scan-morph.is-exiting::before { animation: tl-scan-chrome-out 150ms ease-out forwards; }
+    @keyframes tl-scan-chrome-out {
+      from { opacity: 1; }
+      to   { opacity: 0; } }
+    .tl-scan-morph.is-exiting .tl-scan-face-status {
+      animation: tl-scan-status-out var(--icon-swap-dur) var(--icon-swap-ease) forwards; }
+    @keyframes tl-scan-status-out {
+      from { opacity: 1; filter: blur(0); transform: scale(1); }
+      to   { opacity: 0; filter: blur(var(--icon-swap-blur)); transform: scale(0.98); } }
     .tl-scan-label { white-space: nowrap; }
     /* The BorderBeam library injects its own stylesheet that forces
        position:relative on its [data-beam] container (and it lands later in the
@@ -1716,6 +1771,86 @@
     .tl-refine-foot.is-bar { padding: 8px 16px; gap: 8px; justify-content: stretch;
       background: #fff; border-top: 1px solid #f0f0f0; }
     .tl-refine-foot.is-bar .tl-pill-btn { flex: 1; align-self: stretch; }
+    /* Loading pill → two footer buttons: gooey/liquid split. During exit the
+       scanning pill stays mounted (is-exiting) while status text cross-blurs out;
+       goo blobs start inset-0 on the same 49px stage, then the stage shrinks to
+       32px as the blobs split — no footer/pill position jump. */
+    /* vertical geometry (stage height + foot padding) settles FAST (220ms) while
+       the horizontal split runs the full 300ms — the box is already at its final
+       32px height while the blobs finish sliding apart, so the ending is calm. */
+    .tl-liquid-stage { position: relative; width: 100%; height: 49px; margin-bottom: 20px;
+      animation: tl-liquid-stage-shrink 220ms cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    @keyframes tl-liquid-stage-shrink {
+      to { height: 32px; margin-bottom: 0; } }
+    /* The overlay is anchored to the FOOT's bottom at the bar's exact resting
+       geometry (bottom 8 / sides 16 / height 32) — NOT to the shrinking stage.
+       The foot's bottom edge never moves, so blobs, chrome and labels live at
+       the final position/size for the entire morph; only the fading pill rides
+       the stage. Handoff to the real bar is then pixel-identical. */
+    .tl-liquid-morph { position: absolute; left: 16px; right: 16px; bottom: 8px; height: 32px; }
+    .tl-liquid-goo-svg { position: absolute; width: 0; height: 0; }
+    .tl-liquid-goo { position: absolute; inset: 0; pointer-events: none; z-index: 1;
+      filter: url(#tl-goo) drop-shadow(0 1px 3px rgba(0,0,0,0.08)) drop-shadow(0 0 1px rgba(0,0,0,0.14));
+      /* hand-off: goo cross-fades OUT (250–430ms) in the same window the real
+         buttons cross-fade IN — the surface swaps ownership gradually, so the
+         overlay unmount at 470ms removes an already-invisible layer */
+      animation: tl-liquid-goo-out 180ms ease 250ms both; }
+    @keyframes tl-liquid-goo-out {
+      from { opacity: 1; }
+      to   { opacity: 0; } }
+    /* split runs at the transitions.dev "Smooth ease out" token (300ms) — kept
+       in sync with the stage shrink above so blobs land as the box reaches 32px */
+    .tl-liquid-blob { position: absolute; background: #fff; border-radius: 36px;
+      animation-duration: 300ms; animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+      animation-fill-mode: both; }
+    .tl-liquid-blob-a { animation-name: tl-liquid-a; }
+    .tl-liquid-blob-b { animation-name: tl-liquid-b; }
+    /* from = the scanning pill's box expressed in the overlay's (final-row)
+       coordinates: pill top sits 41px above the row, its bottom 24px above the
+       row's bottom, and it's 4px wider each side (foot pad 20 vs bar pad 16). */
+    @keyframes tl-liquid-a {
+      from { left: 4px; right: 4px; top: -41px; bottom: 24px; border-radius: 60px; }
+      to   { left: 0; right: calc(50% + 4px); top: 0; bottom: 0; border-radius: 36px; } }
+    @keyframes tl-liquid-b {
+      from { left: 4px; right: 4px; top: -41px; bottom: 24px; border-radius: 60px; }
+      to   { left: calc(50% + 4px); right: 0; top: 0; bottom: 0; border-radius: 36px; } }
+    .tl-liquid-btns { position: absolute; inset: 0; display: flex; gap: 8px; z-index: 3; }
+    /* Two independent fades on the real buttons:
+       — LABELS cross-blur in immediately (0–250ms), mirroring the pill label
+         cross-blurring out — the icon-swap pattern, per the pill's own faces.
+       — CHROME (fill + ring + shadow) fades in at 250–430ms, the exact window
+         the goo fades out, so the surface swaps ownership gradually. */
+    .tl-liquid-btns .tl-pill-btn { flex: 1; align-self: stretch;
+      background: transparent; box-shadow: none;
+      animation: tl-liquid-btn-chrome 180ms ease 250ms both; }
+    .tl-liquid-btns .tl-pill-btn > span {
+      animation: tl-liquid-label-in 250ms ease-in-out both; }
+    @keyframes tl-liquid-label-in {
+      from { opacity: 0; filter: blur(var(--icon-swap-blur, 2px)); }
+      to   { opacity: 1; filter: blur(0); } }
+    @keyframes tl-liquid-btn-chrome {
+      from { background: transparent; box-shadow: none; }
+      to   { background: #fff;
+             box-shadow: 0 1px 3px 0 rgba(0,0,0,0.04),
+               inset 0 0 0 1px rgba(0,0,0,0.06),
+               inset 0 -1px 0 0 rgba(0,0,0,0.1),
+               inset 0 0 0 1px rgba(196,196,196,0.1); } }
+    /* the bar's background, hairline and geometry all converge on is-bar's
+       exact resting values DURING the 300ms split (padding 12/20→8/16, border
+       0→1px, colors fade in), so swapping classes at the end is a visual no-op */
+    .tl-refine-foot.is-exiting-scan { position: relative;
+      animation: tl-foot-to-bar 220ms cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    @keyframes tl-foot-to-bar {
+      from { padding: 12px 20px; border-top-width: 0; }
+      to { padding: 8px 16px; border-top-width: 1px; justify-content: stretch; } }
+    .tl-refine-foot.is-exiting-scan.is-morphing { --bar-bg: #fff; --bar-line: #f0f0f0;
+      border-top: 0 solid var(--bar-line);
+      animation: tl-liquid-bar-in 260ms ease both, tl-foot-to-bar 220ms cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    .tl-refine-foot.is-bar.is-morphing { --bar-bg: #fff; --bar-line: #f0f0f0;
+      animation: tl-liquid-bar-in 280ms ease both; }
+    @keyframes tl-liquid-bar-in {
+      from { background: transparent; border-top-color: transparent; }
+      to   { background: var(--bar-bg); border-top-color: var(--bar-line); } }
     @media (prefers-reduced-motion: reduce) {
       .tl-refine-panel { transition: none; }
       .tl-dotm-dot { animation: none !important; }
@@ -1724,6 +1859,21 @@
       .t-text-swap { transition: none !important; }
       .tl-refine-results .t-stagger-line { transition: none !important; }
       .t-resize, .tl-scan-morph { transition: none !important; }
+      .tl-liquid-goo { display: none !important; }
+      .tl-liquid-stage { animation: none !important; height: 32px; margin-bottom: 0; }
+      .tl-refine-foot.is-exiting-scan { animation: none !important; padding: 8px 16px;
+        border-top-width: 1px !important; background: var(--bar-bg, #fff) !important;
+        border-top-color: var(--bar-line, #f0f0f0) !important; }
+      .tl-scan-morph.is-exiting { animation: none !important; inset: 0; }
+      .tl-scan-morph.is-exiting .tl-scan-beam,
+      .tl-scan-morph.is-exiting::before,
+      .tl-scan-morph.is-exiting::after,
+      .tl-scan-morph.is-exiting .tl-scan-face-status { animation: none !important; opacity: 0; }
+      .tl-liquid-btns .tl-pill-btn { animation: none !important; background: #fff;
+        box-shadow: 0 1px 3px 0 rgba(0,0,0,0.04), inset 0 0 0 1px rgba(0,0,0,0.06),
+          inset 0 -1px 0 0 rgba(0,0,0,0.1), inset 0 0 0 1px rgba(196,196,196,0.1); }
+      .tl-liquid-btns .tl-pill-btn > span { animation: none !important; }
+      .tl-refine-foot.is-bar.is-morphing { animation: none !important; }
       .tl-pill-btn.tl-apply-btn { transition: background 0.12s ease, scale 0.12s ease, opacity 0.12s ease !important; }
       .tl-apply-check { transition: none !important; }
       .tl-sug-check { animation: none !important; opacity: 1; }
@@ -1805,8 +1955,10 @@
     html[data-tl-theme="dark"] .tl-insp-member { background: rgba(255,255,255,0.04); color: #bdbdbd; box-shadow: 0 0 0 1px rgba(255,255,255,0.08); }
     html[data-tl-theme="dark"] .tl-insp-title { color: #fbfbfb; }
     html[data-tl-theme="dark"] .tl-insp-label { color: #8b8b8b; }
-    html[data-tl-theme="dark"] .tl-bar {
-      box-shadow: 0 1px 1px 0 rgba(0,0,0,0.24), inset 0 0 0 1px rgba(255,255,255,0.04), inset 0 1px 0 0 rgba(255,255,255,0.06); }
+    html[data-tl-theme="dark"] .tl-bar-body { filter: drop-shadow(0 1px 2px rgba(0,0,0,0.32)); }
+    html[data-tl-theme="dark"] .tl-bar-body path { stroke: url(#rb-ring-dark); }
+    html[data-tl-theme="dark"] #rb-ring stop:first-child { stop-opacity: 0.04; }
+    html[data-tl-theme="dark"] #rb-ring stop:last-child { stop-opacity: 0.08; }
     html[data-tl-theme="dark"] .tl-ruler .tick { background: rgba(255,255,255,0.18); }
     /* dark thin scrollbars */
     html[data-tl-theme="dark"] .tl-inspector,
@@ -1991,6 +2143,24 @@
     html[data-tl-theme="dark"] .tl-pill-btn.is-applied { color: #fbfbfb; background: rgba(255,255,255,0.06); box-shadow: none; }
     html[data-tl-theme="dark"] .tl-pill-btn.is-applied svg path { stroke: #fbfbfb; }
     html[data-tl-theme="dark"] .tl-refine-foot.is-bar { background: #1b1b1b; border-top-color: #262626; }
+    /* liquid morph blobs need an OPAQUE fill (the goo filter hard-steps alpha,
+       so a translucent fill would clip to nothing): flatten the dark pill's
+       rgba(255,255,255,0.06)-over-#1b1b1b to its composite. */
+    html[data-tl-theme="dark"] .tl-liquid-blob { background: #292929; }
+    html[data-tl-theme="dark"] .tl-liquid-goo {
+      filter: url(#tl-goo) drop-shadow(0 1px 1px rgba(0,0,0,0.24)); }
+    /* dark chrome fade — same 250–430ms window as light */
+    @keyframes tl-liquid-btn-chrome-dark {
+      from { background: transparent; box-shadow: none; }
+      to   { background: rgba(255,255,255,0.06);
+             box-shadow: 0 1px 1px 0 rgba(0,0,0,0.24),
+               inset 0 0 0 1px rgba(255,255,255,0.04),
+               inset 0 1px 0 0 rgba(255,255,255,0.06); } }
+    html[data-tl-theme="dark"] .tl-liquid-btns .tl-pill-btn {
+      animation: tl-liquid-btn-chrome-dark 180ms ease 250ms both; }
+    html[data-tl-theme="dark"] .tl-refine-foot.is-bar.is-morphing,
+    html[data-tl-theme="dark"] .tl-refine-foot.is-exiting-scan.is-morphing {
+      --bar-bg: #1b1b1b; --bar-line: #262626; }
 
     /* — Apply-all footer buttons (.pc-btn, shared into the build) — */
     html[data-tl-theme="dark"] .pc-btn { background: rgba(255,255,255,0.06); color: #fbfbfb; border-color: rgba(255,255,255,0.12); }
@@ -2651,7 +2821,8 @@
     // the three relay fns below short-circuit to a built-in mock so the panel is
     // fully interactive with NO relay/LLM/CLI. When the flag is UNSET this whole
     // block is inert and every fn falls through to the real fetch path unchanged.
-    const TX_MOCK = typeof window!=="undefined" && window.__TX_REFINE_MOCK;
+    const TX_MOCK = typeof window!=="undefined" &&
+      (window.__TX_REFINE_MOCK || /[?&]txmock\b/.test(window.location.search));
     const _txMockJobs = new Map(); // id → { request, createdAt }
     const _txMockId = ()=>"mock-"+Date.now()+"-"+Math.random().toString(36).slice(2,8);
     const _txMs = (n)=>(n==null?"":Math.round(n)+"ms");
@@ -3135,6 +3306,26 @@
         const id=setInterval(()=>setStatusIx(i=>(i+1)%REFINE_STATUS.length),2800);
         return()=>clearInterval(id);
       },[phase]);
+      // liquid morph: when the scan finishes WITH results, the loading pill
+      // splits into the two bar buttons via a gooey overlay. One-shot per scan;
+      // cleared after the blob keyframes + button cross-blur settle.
+      // useLayoutEffect (not useEffect): the flag must flip BEFORE the "done"
+      // frame paints, otherwise the bar buttons flash for a frame, then the
+      // exiting pill re-mounts on top of them — visible pill/buttons flicker.
+      const[liquidMorph,setLiquidMorph]=useState(false);
+      const prevPhaseRef=useRef(phase);
+      useLayoutEffect(()=>{
+        const prev=prevPhaseRef.current;
+        prevPhaseRef.current=phase;
+        if(prev==="scanning"&&phase==="done"){
+          setLiquidMorph(true);
+          // 300ms split → 300–430ms goo/chrome hand-off; unmount at 470ms once
+          // the buttons are fully self-sufficient (small buffer past 430ms).
+          const to=setTimeout(()=>setLiquidMorph(false),470);
+          return()=>clearTimeout(to);
+        }
+        if(phase!=="done")setLiquidMorph(false);
+      },[phase]);
       if(!render)return null;
 
       // one scan returns both kinds; each tab shows only its own:
@@ -3155,17 +3346,19 @@
       // node morphs (card resize) into the loading rectangle with the border-beam.
       const scanning = phase==="scanning";
       const startBtn=(o)=>{o=o||{};
+        const exiting = !!o.exiting;
+        const showScanning = scanning || exiting;
         // Both faces stay mounted and stacked; the morph cross-blurs (icon swap)
         // between the label and the icon+status instead of swapping the subtree.
-        return h("button",{className:cx("tl-scan-morph","t-resize",scanning&&"is-scanning"),
-          disabled:(!!o.disabled)||scanning,"aria-busy":scanning?"true":undefined,
-          onClick:(o.disabled||scanning)?undefined:onStart},
+        return h("button",{className:cx("tl-scan-morph","t-resize",showScanning&&"is-scanning",exiting&&"is-exiting"),
+          disabled:(!!o.disabled)||showScanning,"aria-busy":scanning?"true":undefined,
+          onClick:(o.disabled||showScanning)?undefined:onStart},
           scanning&&h(BorderBeam,{size:"md",colorVariant:"ocean",theme:resolvedTheme==="dark"?"dark":"light",duration:2.6,saturation:2,brightness:1.6,className:"tl-scan-beam"},
             h("span",{className:"tl-scan-beam-fill"})),
           h("span",{className:"tl-scan-content"},
-            h("span",{className:"tl-scan-face tl-scan-face-label","aria-hidden":scanning?"true":undefined},
+            h("span",{className:"tl-scan-face tl-scan-face-label","aria-hidden":showScanning?"true":undefined},
               h("span",{className:"tl-scan-label"},o.label||"Start scanning")),
-            h("span",{className:"tl-scan-face tl-scan-face-status","aria-hidden":scanning?undefined:"true"},
+            h("span",{className:"tl-scan-face tl-scan-face-status","aria-hidden":showScanning&&!exiting?undefined:"true"},
               h(DotmLoader),
               h(ShimmerSwapText,{text:REFINE_STATUS[statusIx]}))));
       };
@@ -3213,6 +3406,10 @@
 
       // Foot tracks the active type (it lives below the sliding body, so it
       // just updates in place on a tab switch).
+      // The liquid split only plays when the finished scan actually shows the
+      // two-button bar — with zero results the foot is a plain pill and must
+      // not pick up the morphing footer classes.
+      const morphing = liquidMorph && phase==="done" && visible.length>0;
       let foot, footBar=false;
       if(phase==="scanning"){
         foot = startBtn();
@@ -3222,12 +3419,38 @@
         if(visible.length===0){
           foot = startBtn({label:"Scan again"});
         } else {
-          footBar = true;
-          foot = h(React.Fragment,null,
+          footBar = !morphing;
+          const barBtns = h(React.Fragment,null,
             h("button",{className:"tl-pill-btn",disabled:pending.length===0,
               onClick:()=>pending.forEach(onApply)},
               h("span",null,"Apply all ",h("span",{className:"tl-dim"},"("+pending.length+")"))),
-            h("button",{className:"tl-pill-btn",onClick:onStart},"Scan again"));
+            h("button",{className:"tl-pill-btn",onClick:onStart},h("span",null,"Scan again")));
+          foot = morphing
+            // gooey split: the exiting pill fades out on the shrinking stage
+            // (which drives the foot's height transition), while the overlay —
+            // blobs, chrome, labels — is a foot-anchored SIBLING pinned to the
+            // bar's final geometry, so it never moves or resizes at handoff.
+            ? h(React.Fragment,null,
+                h("div",{className:"tl-liquid-stage"}),
+                h("div",{className:"tl-liquid-morph"},
+                  startBtn({exiting:true}),
+                  h("svg",{className:"tl-liquid-goo-svg","aria-hidden":"true",focusable:"false"},
+                    h("defs",null,
+                      h("filter",{id:"tl-goo"},
+                        // alpha threshold must be exactly 0.5 (20a - 10): a blurred
+                        // straight edge crosses 0.5 precisely AT the true geometry
+                        // edge, so goo pills render at the real 32px button height.
+                        // Lower thresholds (e.g. 22a - 9 = 0.41) dilate every edge
+                        // ~1.5px outward — the goo state looked ~4px taller.
+                        h("feGaussianBlur",{in:"SourceGraphic",stdDeviation:"7",result:"blur"}),
+                        h("feColorMatrix",{in:"blur",mode:"matrix",
+                          values:"1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -10",result:"goo"}),
+                        h("feComposite",{in:"SourceGraphic",in2:"goo",operator:"atop"})))),
+                  h("div",{className:"tl-liquid-goo"},
+                    h("div",{className:"tl-liquid-blob tl-liquid-blob-a"}),
+                    h("div",{className:"tl-liquid-blob tl-liquid-blob-b"})),
+                  h("div",{className:"tl-liquid-btns"},barBtns)))
+            : barBtns;
         }
       } else { // idle
         foot = startBtn(agentReady?{}:{disabled:true});
@@ -3263,7 +3486,7 @@
               bodyFor("small",refineType==="small")),
             h("div",{className:"tl-refine-page t-page","data-page-id":"2","aria-hidden":refineType!=="replace"},
               bodyFor("replace",refineType==="replace"))),
-          h("div",{className:cx("tl-refine-foot",footBar&&"is-bar")},foot)));
+          h("div",{className:cx("tl-refine-foot",footBar&&"is-bar",morphing&&"is-exiting-scan",morphing&&"is-morphing")},foot)));
     }
 
     // Diff the active item's effective (edited/refined) lanes against their
@@ -3501,47 +3724,181 @@
       );
     }
 
+    // capsule outline: right-drag pinches inward (neck), left-drag bows outward
+    // (belly, 70% depth). `amt` > 0 = outward, < 0 = inward. Same command
+    // structure at every value so the CSS `d` transition interpolates smoothly.
+    const RB_H=24, RB_R=8;
+    function rbPath(w, amt){
+      const mx=(w/2).toFixed(1), t=(-2*amt).toFixed(2), b=(RB_H+2*amt).toFixed(2);
+      return `path("M 0 ${RB_R} Q 0 0 ${RB_R} 0 Q ${mx} ${t} ${w-RB_R} 0 Q ${w} 0 ${w} ${RB_R} L ${w} ${RB_H-RB_R} Q ${w} ${RB_H} ${w-RB_R} ${RB_H} Q ${mx} ${b} ${RB_R} ${RB_H} Q 0 ${RB_H} 0 ${RB_H-RB_R} Z")`;
+    }
+
     function PropTrack({property, member, delayMs, durationMs, selected, onSelect, onDelayChange, onDurationChange, snap, scaleMs, lockDuration, labelW}){
       const trackRef=useRef(null);
+      const barRef=useRef(null);
       const [dragging,setDragging]=useState(false);
-      // 1ms resolution while dragging so the bar moves smoothly; the snap grid
-      // (25ms) is applied only on release when `snap` is on.
+      // Drag math stays at 1ms resolution for smooth motion. Any coarse grid
+      // quantization is avoided here because it reads as frame snapping.
       const SNAP_GRID = 25;
       const pxToMs=useCallback((px,g)=>{if(!trackRef.current)return 0;const w=trackRef.current.getBoundingClientRect().width;const gg=g||1;return Math.round((px/w)*scaleMs/gg)*gg;},[scaleMs]);
+
+      // keep the SVG body outline in sync with the bar's real size
+      useLayoutEffect(()=>{
+        const bar=barRef.current; if(!bar) return;
+        const p=bar.querySelector(".tl-bar-body path");
+        const sync=()=>{
+          if(bar.classList.contains("rb-release")) return;
+          if(bar.classList.contains("is-dragging")){
+            p.style.d=rbPath(bar.offsetWidth,bar.__rbBulge||0);
+            return;
+          }
+          p.style.transition="none";
+          p.style.d=rbPath(bar.offsetWidth,0);
+          requestAnimationFrame(()=>p.style.removeProperty("transition"));
+        };
+        sync();
+        const ro=new ResizeObserver(sync); ro.observe(bar);
+        return ()=>ro.disconnect();
+      },[]);
 
       const startDrag=useCallback((mode,e)=>{
         e.preventDefault(); e.stopPropagation();
         onSelect();
-        // a spring controls its own duration, so its bar can be moved (delay) but not resized
         if(lockDuration && mode!=="move") return;
         setDragging(true);
         const startX=e.clientX; const sd=delayMs; const sdur=durationMs;
         let lastDel=sd, lastDur=sdur;
-        const onMove=e2=>{
-          const dx=e2.clientX-startX; const dMs=pxToMs(dx,1); // smooth: 1ms steps
+
+        // ── rubber-band physics ──
+        const bar=barRef.current;
+        const bodyPath=bar?bar.querySelector(".tl-bar-body path"):null;
+        let lastX=e.clientX, lastT=performance.now();
+        let vel=0, dir=1, over=0, raf=0;
+        if(bar){
+          clearTimeout(bar.__rbCleanup);
+          bar.classList.remove("rb-release");
+          bar.classList.add("is-dragging");
+        }
+        const STRAIGHT_HANDLE='path("M 4 1 L 4 13")';
+        const leftPath=bar?bar.querySelector(".tl-bar-handle.left path"):null;
+        const rightPath=bar?bar.querySelector(".tl-bar-handle.right path"):null;
+        const bentHandle=bow=>{
+          const tip=(4+bow*0.15).toFixed(2), mid=(4+bow).toFixed(2);
+          return `path("M ${tip} 1 Q ${mid} 7 ${tip} 13")`;
+        };
+        const setHandleBend=(bow,leading)=>{
+          if(leftPath) leftPath.style.d=leading==="left"?bentHandle(bow):STRAIGHT_HANDLE;
+          if(rightPath) rightPath.style.d=leading==="right"?bentHandle(bow):STRAIGHT_HANDLE;
+        };
+        let env=0;
+        const setVars=()=>{
+          if(!bar||!bodyPath) return;
+          const sV=Math.abs(vel)/(Math.abs(vel)+0.15);
+          const sO=over/(over+40);
+          const s=Math.min(1,Math.max(sV,sO)*1.05);
+          env=s>env?env+(s-env)*0.35:env*0.90;
+          const w=bar.offsetWidth;
           if(mode==="move"){
-            lastDel=Math.max(0,Math.min(sd+dMs,scaleMs-sdur));
-            onDelayChange(lastDel);
+            // Whole-bar drag should be pure translation only: no rubber bend.
+            bar.__rbBulge=0;
+            for(const v of ["--rb-origin","--rb-sx","--rb-sy","--rb-skew","--rb-hshift"]) bar.style.removeProperty(v);
+            bodyPath.style.d=rbPath(w,0);
+            setHandleBend(0,"none");
+            return;
+          }
+          // Left-edge resize should mirror the bend direction (user expectation:
+          // same pointer motion on the left edge bends opposite to the right edge).
+          const bendDir = mode==="left" ? -dir : dir;
+          const origin=mode==="move"?(dir>0?"0%":"100%"):(mode==="right"?"0%":"100%");
+          bar.style.setProperty("--rb-origin",origin);
+          bar.style.setProperty("--rb-sx",(1+(8*env)/Math.max(w,24)).toFixed(4));
+          bar.style.setProperty("--rb-sy",(1-0.1*env).toFixed(4));
+          bar.style.setProperty("--rb-skew",(bendDir*-3*env).toFixed(2)+"deg");
+          bar.style.setProperty("--rb-hshift",(bendDir*1.5*env).toFixed(2)+"px");
+          const bend=Math.min(4,(w-16)/8)*env;
+          bar.__rbBulge=bendDir<0?bend*0.7:-bend;
+          bodyPath.style.d=rbPath(w,bar.__rbBulge);
+          const leading=mode==="move"?(dir>0?"right":"left"):mode;
+          setHandleBend(bendDir*8*env,leading);
+        };
+        let lastTick=performance.now();
+        const tick=()=>{ lastTick=performance.now(); vel*=0.86; setVars(); raf=requestAnimationFrame(tick); };
+        raf=requestAnimationFrame(tick);
+        const safety=setInterval(()=>{
+          if(performance.now()-lastTick<40) return;
+          vel*=0.86; setVars();
+        },50);
+
+        const onMove=e2=>{
+          const now=performance.now(); const dt=Math.max(1,now-lastT);
+          const iv=(e2.clientX-lastX)/dt;
+          vel+=(iv-vel)*0.3;
+          if(Math.abs(vel)>0.05) dir=vel>0?1:-1;
+          lastX=e2.clientX; lastT=now;
+          const w=trackRef.current?trackRef.current.getBoundingClientRect().width:1;
+          const msToPx=ms=>Math.abs(ms)/scaleMs*w;
+          const grid=1;
+          const dx=e2.clientX-startX; const dMs=pxToMs(dx,grid);
+          if(mode==="move"){
+            const raw=sd+dMs; const next=Math.max(0,Math.min(raw,scaleMs-sdur));
+            over=msToPx(raw-next);
+            lastDel=next; onDelayChange(next);
           } else if(mode==="left"){
-            const rawDel=sd+dMs; const clampedDel=Math.max(0,Math.min(rawDel,sd+sdur-1));
+            const rawDel=sd+dMs; const clampedDel=Math.max(0,Math.min(rawDel,sd+sdur-grid));
+            over=msToPx(rawDel-clampedDel);
             lastDel=clampedDel; lastDur=sdur-(clampedDel-sd);
             onDelayChange(lastDel); onDurationChange(lastDur);
           } else {
-            lastDur=Math.max(1,Math.min(sdur+dMs,scaleMs-sd));
-            onDurationChange(lastDur);
+            const rawDur=sdur+dMs; const next=Math.max(grid,Math.min(rawDur,scaleMs-sd));
+            over=msToPx(rawDur-next);
+            lastDur=next; onDurationChange(next);
           }
+          setVars();
         };
         const onUp=()=>{
-          setDragging(false);
-          // snap to the grid once, on release (bar tweens there since the
-          // is-dragging transition lock is now removed).
-          if(snap){
-            const g=SNAP_GRID, sn=v=>Math.round(v/g)*g;
-            if(mode==="move"){ onDelayChange(Math.max(0,Math.min(sn(lastDel),scaleMs-sdur))); }
-            else if(mode==="left"){ onDelayChange(Math.max(0,sn(lastDel))); onDurationChange(Math.max(g,sn(lastDur))); }
-            else { onDurationChange(Math.max(g,Math.min(sn(lastDur),scaleMs-sd))); }
-          }
           window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);
+          cancelAnimationFrame(raf); clearInterval(safety);
+          // Freeze the bar exactly where it is RENDERED at mouseup. On a fast
+          // drag React's last state flush can still be in flight — the DOM lags
+          // the pointer — and letting that flush land after release reads as
+          // the bar drifting on its own. Committing the visible layout position
+          // (offsetLeft/offsetWidth → ms) overrides any in-flight value with
+          // what the user actually sees, so the bar cannot move after release.
+          if(bar&&trackRef.current){
+            const grid=1;
+            const tw=trackRef.current.getBoundingClientRect().width||1;
+            const px2ms=px=>Math.round(px/tw*scaleMs/grid)*grid;
+            const visDel=Math.max(0,px2ms(bar.offsetLeft));
+            if(mode==="move"){
+              onDelayChange(Math.min(visDel,Math.max(0,scaleMs-sdur)));
+            } else if(bar.offsetWidth>24){ // min-width clamp would corrupt px→ms
+              const visDur=Math.max(grid,px2ms(bar.offsetWidth));
+              if(mode==="left"){ onDelayChange(visDel); onDurationChange(visDur); }
+              else { onDurationChange(Math.min(visDur,scaleMs-sd)); }
+            }
+          }
+          if(bar&&bodyPath){
+            bar.__rbBulge=0;
+            for(const v of ["--rb-sx","--rb-sy","--rb-skew","--rb-hshift"]) bar.style.removeProperty(v);
+            bodyPath.style.d=rbPath(bar.offsetWidth,0);
+            setHandleBend(0,"none");
+            // geometry tweens stay hard-disabled until the release commit has
+            // rendered — position must land instantly (it equals what's already
+            // on screen), never animate.
+            bar.classList.add("no-geom-tween");
+            if(mode!=="move") bar.classList.add("rb-release");
+            requestAnimationFrame(()=>requestAnimationFrame(()=>{
+              setDragging(false);
+              bar.classList.remove("no-geom-tween");
+            }));
+            bar.__rbCleanup=setTimeout(()=>{
+              bar.classList.remove("rb-release");
+              bar.style.removeProperty("--rb-origin");
+              bodyPath.style.d=rbPath(bar.offsetWidth,0);
+              if(leftPath) leftPath.style.removeProperty("d");
+              if(rightPath) rightPath.style.removeProperty("d");
+            },220);
+          }
         };
         window.addEventListener("mousemove",onMove);window.addEventListener("mouseup",onUp);
       },[delayMs,durationMs,pxToMs,snap,scaleMs,onSelect,onDelayChange,onDurationChange,lockDuration]);
@@ -3553,10 +3910,15 @@
             member&&h("span",{className:"tl-prop-member"},member),
             h("span",{className:"tl-prop-prop"},property))),
         h("div",{className:"tl-prop-track",ref:trackRef},
-          h("div",{className:cx("tl-bar",dragging&&"is-dragging"),style:{left:delPct+"%",width:durPct+"%"},onMouseDown:e=>startDrag("move",e),
+          h("div",{className:cx("tl-bar",dragging&&"is-dragging"),ref:barRef,style:{left:delPct+"%",width:durPct+"%"},onMouseDown:e=>startDrag("move",e),
             title:lockDuration?"Spring duration is derived \u2014 drag to move, resize is locked":undefined},
-            h("span",{className:"tl-bar-handle left"}),
-            h("span",{className:"tl-bar-handle right"}),
+            h("svg",{className:"tl-bar-body","aria-hidden":true},
+              h("defs",null,h("linearGradient",{id:"rb-ring",x1:0,y1:0,x2:0,y2:1},
+                h("stop",{offset:"0",stopColor:"#000",stopOpacity:0.06}),
+                h("stop",{offset:"1",stopColor:"#000",stopOpacity:0.15}))),
+              h("path",null)),
+            h("span",{className:"tl-bar-handle left"},h("svg",{viewBox:"0 0 8 14"},h("path",{d:"M 4 1 L 4 13"}))),
+            h("span",{className:"tl-bar-handle right"},h("svg",{viewBox:"0 0 8 14"},h("path",{d:"M 4 1 L 4 13"}))),
             !lockDuration&&h("div",{className:"tl-bar-grip left",onMouseDown:e=>startDrag("left",e)}),
             !lockDuration&&h("div",{className:"tl-bar-grip right",onMouseDown:e=>startDrag("right",e)}),
           ),
