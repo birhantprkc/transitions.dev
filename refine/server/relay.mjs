@@ -265,8 +265,25 @@ const RECIPES_BLOCK = [
   "- Card hover tilt: 3D tilt toward the pointer (19-card-tilt.md)",
   "- Plus to menu morph: a circular trigger becomes the surface it opens (20-plus-menu-morph.md)",
   "- Accordion expand: a collapsible body grows/shrinks in height (21-accordion.md)",
+  "Recipe non-resting values — the pre-blur/pre-scale the recipe animates FROM (settling to blur 0 / scale 1). When you pick one of these recipes you MUST also emit a lane-level value patch for it, EVEN IF the input has no such lane (add the lane so the element gains the recipe's blur/scale):",
+  "  - Panel reveal → filter blur 2px (Small)",
+  "  - Page side-by-side → filter blur 3px (Medium) on the sliding page",
+  "  - Icon swap → filter blur 2px (Small)",
+  "  - Skeleton loader and reveal → filter blur 2px (Small)",
+  "  - Texts reveal → filter blur 3px (Medium)",
+  "  - Success check → filter blur 8px (Large)",
+  "  - Modal open/close → transform scale 0.96 (Large)",
+  "  - Menu dropdown → transform scale 0.97 (Medium) open, 0.99 (Tiny) close",
+  "  - Tooltip open/close → transform scale 0.98 (Small)",
   "Tie-break: prefer the lower-overhead recipe (card resize over panel reveal, dropdown over modal). If no recipe genuinely fits, return an empty suggestions array.",
 ].join("\n");
+
+// Shared guidance for the token-tweak passes (small + both). Mirrors the
+// deterministic engine's "missing-blur" path: some usages animate a non-resting
+// pre-blur that a bare opacity/transform capture won't show, so the agent must
+// ADD it rather than only tweak blur lanes that already exist.
+const MISSING_BLUR_NOTE =
+  "MISSING BLUR: blur can be ABSENT, not just off-token. When the inferred usage clearly implies a non-resting pre-blur per the Blur tokens above (e.g. a page slide / page side-by-side panel → 3px Medium; an icon swap, text swap, panel reveal, skeleton reveal or number pop-in → 2px Small; a text reveal → 3px Medium; a success check → 8px Large) but the input timings carry NO `filter` lane, ADD one: emit a `blur` suggestion with `property:\"filter\"`, `from:\"0px\"`, `to` the usage token (e.g. \"3px\"), echoing the `member` (and `varName` if present) of the sibling lanes so the sliding/swapping element gains the recipe's blur. Only add blur when the usage genuinely calls for it — never on motion that is intentionally opacity-only (a plain fade, a colour/theme change).";
 
 function buildPrompt(job) {
   const r = job.request || {};
@@ -300,7 +317,7 @@ function buildPrompt(job) {
     );
     if (multiPhase) {
       lines.push(
-        "RELATED PHASES: `phases` lists this transition's related states (e.g. open AND close). They are ONE motion — a recipe swap must update them TOGETHER. For the replace suggestion emit a `patches` array with ONE timing entry per phase in `phases`, shaped `{\"phase\":<phase>,\"property\":\"all\",\"durationMs\":...,\"easing\":...}`. If the recipe also uses transform pre-scale or filter pre-blur, add EXTRA per-lane value patches for those lanes (not property:\"all\") and include that lane's `member` + `varName` from input timings, e.g. `{\"phase\":\"open\",\"property\":\"transform\",\"member\":\"Panel\",\"varName\":\"--dropdown-pre-scale\",\"scale\":0.97}` and `{\"phase\":\"open\",\"property\":\"filter\",\"member\":\"Panel\",\"varName\":\"--panel-blur\",\"blur\":2}`. Take each phase duration from MOTION TOKENS (open usually slower than close, e.g. 250ms/150ms). Also include a single `patch` for live preview (first timing patch is fine). Apply will write every phase from `patches`.",
+        "RELATED PHASES: `phases` lists this transition's related states (e.g. open AND close). They are ONE motion — a recipe swap must update them TOGETHER. For the replace suggestion emit a `patches` array with ONE timing entry per phase in `phases`, shaped `{\"phase\":<phase>,\"property\":\"all\",\"durationMs\":...,\"easing\":...}`. If the recipe uses transform pre-scale or filter pre-blur (see \"Recipe non-resting values\" above), add EXTRA per-lane value patches for those lanes (not property:\"all\"), e.g. `{\"phase\":\"open\",\"property\":\"transform\",\"member\":\"Panel\",\"varName\":\"--dropdown-pre-scale\",\"scale\":0.97}` and `{\"phase\":\"open\",\"property\":\"filter\",\"member\":\"Panel\",\"varName\":\"--panel-blur\",\"blur\":2}`. Copy each lane's `member` + `varName` from the input timings when that lane exists; when the recipe adds a lane the input LACKS (e.g. Page side-by-side prescribes a 3px blur but the captured page has no `filter` lane), STILL emit the blur patch — reuse the sibling lane's `member` so it targets the right element and omit `varName`. Take each phase duration from MOTION TOKENS (open usually slower than close, e.g. 250ms/150ms). Also include a single `patch` for live preview (first timing patch is fine). Apply will write every phase from `patches`.",
         "",
       );
     }
@@ -310,21 +327,23 @@ function buildPrompt(job) {
       "refineType is \"replace\": suggest a WHOLE-TRANSITION replacement ONLY — do NOT propose motion-token tweaks (no kind \"duration\"/\"delay\"/\"easing\").",
       multiPhase
         ? "Pick the SINGLE best-fit recipe from the list above. Emit ONE suggestion with kind \"replace\": include the `patches` array (one entry per related phase, as described above) AND a single `patch` (the first phase) for the live preview, add a `reference` field with the reference filename, and name the recipe in `title`/`reason`. If no recipe genuinely fits the usage, return an empty suggestions array."
-        : "Pick the SINGLE best-fit recipe from the list above. Emit ONE suggestion with kind \"replace\": set its `patch` to the motion-token duration/easing for the recipe's phase on the property that already transitions (or \"all\") so Apply works live, add a `reference` field with the reference filename, and name the recipe in `title`/`reason`. If no recipe genuinely fits the usage, return an empty suggestions array.",
+        : "Pick the SINGLE best-fit recipe from the list above. Emit ONE suggestion with kind \"replace\": set its `patch` to the motion-token duration/easing for the recipe's phase on the property that already transitions (or \"all\") so Apply works live, add a `reference` field with the reference filename, and name the recipe in `title`/`reason`. If the recipe prescribes a non-resting pre-blur/pre-scale (see \"Recipe non-resting values\" above), put that value on the `patch` too (add `blur` for a filter-blur recipe like Page side-by-side → 3px, `scale` for a scale recipe) so the sliding/scaling element gains it even when the captured transition had no such lane. If no recipe genuinely fits the usage, return an empty suggestions array.",
       "Answer in ONE response — do NOT read or search files.",
     );
   } else if (refineType === "both") {
     lines.push(
       "refineType is \"both\": produce TWO independent groups in the SAME suggestions array — the UI shows them in separate tabs, so include each group whenever it applies.",
       "(1) Motion-token tweaks (kind \"duration\"/\"delay\"/\"easing\"/\"scale\"/\"blur\"): for each declaration, propose the token value only where it DIFFERS from the current one. Use \"scale\" for an off-token transform pre-scale and \"blur\" for an off-token filter pre-blur, picked by usage.",
+      MISSING_BLUR_NOTE,
       multiPhase
         ? "(2) Whole-transition replacement (kind \"replace\"): ALWAYS evaluate one — pick the SINGLE best-fit recipe. Emit at most ONE \"replace\" suggestion with the `patches` array (one entry per related phase) AND a single `patch` (the first phase), a `reference` field, and the recipe named in `title`/`reason`. If no recipe genuinely fits, omit the replace suggestion."
-        : "(2) Whole-transition replacement (kind \"replace\"): ALWAYS evaluate one — pick the SINGLE best-fit recipe from the list above. Emit at most ONE \"replace\" suggestion: set its `patch` to the motion-token duration/easing for the recipe's phase on the property that already transitions (or \"all\"), add a `reference` field with the reference filename, and name the recipe in `title`/`reason`. If no recipe genuinely fits, omit the replace suggestion.",
+        : "(2) Whole-transition replacement (kind \"replace\"): ALWAYS evaluate one — pick the SINGLE best-fit recipe from the list above. Emit at most ONE \"replace\" suggestion: set its `patch` to the motion-token duration/easing for the recipe's phase on the property that already transitions (or \"all\"); if the recipe prescribes a non-resting pre-blur/pre-scale (see \"Recipe non-resting values\" above) put that `blur`/`scale` on the `patch` too so e.g. Page side-by-side gains its 3px blur. Add a `reference` field with the reference filename, and name the recipe in `title`/`reason`. If no recipe genuinely fits, omit the replace suggestion.",
       "Answer in ONE response — do NOT read or search files.",
     );
   } else {
     lines.push(
       "refineType is \"small\": suggest motion-token tweaks ONLY — for each declaration, propose the token value only where it DIFFERS from the current one (kind \"duration\"/\"delay\"/\"easing\"/\"scale\"/\"blur\"). Use \"scale\" for an off-token transform pre-scale and \"blur\" for an off-token filter pre-blur, picked by usage. Do NOT propose a whole-transition replacement (no kind \"replace\") — the Replace tab requests that separately.",
+      MISSING_BLUR_NOTE,
       "Answer in ONE response using ONLY the data above. Do NOT read or search files, run tools, spawn subagents, or explore the codebase — the motion tokens contain everything you need. This is a quick judgement, not a coding task.",
     );
   }
