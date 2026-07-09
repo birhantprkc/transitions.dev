@@ -105,13 +105,16 @@
     }
   </script>
   <script>
-    // Apply theme from system preference before first paint to avoid FOUC.
-    // Session-only toggle overrides this (see end of <body>); not persisted.
+    // Apply theme before first paint to avoid FOUC: a manually chosen theme,
+    // persisted to localStorage by the toggle (see end of <body>), wins over
+    // system preference so it carries across reloads and other pages.
     (function () {
       try {
-        if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-          document.documentElement.setAttribute("data-theme", "dark");
-        }
+        var stored = localStorage.getItem("tdev:theme");
+        var dark = stored
+          ? stored === "dark"
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        if (dark) document.documentElement.setAttribute("data-theme", "dark");
       } catch (e) {}
     })();
   </script>
@@ -2561,7 +2564,7 @@
     }
 
     @media (max-width: 639px) {
-      .app { padding: 0 20px 48px; }
+      .app { padding: 0 12px 48px; }
       /* Collapse the inline nav pills into the hamburger; the GitHub
          pill keeps its live star count (the metric people came for). */
       .site-nav-menu { display: none; }
@@ -2581,7 +2584,7 @@
          the desktop layout uses a hardcoded <br/> after "that" which
          produces awkward extra breaks on mobile. */
       .subtitle br { display: none; }
-      /* Cards span the full available width (viewport − 20px margins)
+      /* Cards span the full available width (viewport − 12px margins)
          instead of the fixed 320px desktop width. */
       .cards { grid-template-columns: 1fr; }
       /* Compensate for mobile browsers down-sampling the backing
@@ -3733,7 +3736,7 @@
           <iframe
             id="skill-compare-iframe-off"
             class="skill-compare-iframe"
-            src="example-dropdown.html?embed=1&style=generic&v=20260709-13"
+            src="example-dropdown.html?embed=1&style=generic&v=20260709-14"
             title="Share dropdown demo without Transitions.dev skill — no motion"
             loading="lazy"
           ></iframe>
@@ -3756,7 +3759,7 @@
           <iframe
             id="skill-compare-iframe"
             class="skill-compare-iframe"
-            src="example-dropdown.html?embed=1&v=20260709-13"
+            src="example-dropdown.html?embed=1&v=20260709-14"
             title="Share dropdown demo built with Transitions.dev skill"
             loading="lazy"
           ></iframe>
@@ -3963,16 +3966,21 @@
     (function () {
       /* ── Theme toggle ──────────────────────────────────────────
          Default theme follows system settings (see inline script in
-         <head>). The button below is a session-only override and is
-         not persisted. If the OS theme flips while the page is open
-         and the user hasn't manually toggled, we mirror the OS. */
+         <head>). A manual toggle is persisted to localStorage
+         ("tdev:theme") so it carries across reloads and other pages
+         on the site. Until overridden, OS theme changes are mirrored. */
       var html = document.documentElement;
       var iconStack = document.getElementById("theme-icon-stack");
       var userOverride = false;
+      try { userOverride = !!localStorage.getItem("tdev:theme"); } catch (e) {}
 
       function currentSystemTheme() {
         return (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches)
           ? "dark" : "light";
+      }
+
+      function storedTheme() {
+        try { return localStorage.getItem("tdev:theme"); } catch (e) { return null; }
       }
 
       function applyTheme(next) {
@@ -3994,7 +4002,7 @@
         });
       }
 
-      var initial = currentSystemTheme();
+      var initial = storedTheme() || currentSystemTheme();
       applyTheme(initial);
 
       // Re-push the current theme once each iframe finishes loading,
@@ -4019,7 +4027,9 @@
         btn.addEventListener("click", function () {
           userOverride = true;
           var current = html.getAttribute("data-theme") === "dark" ? "dark" : "light";
-          applyTheme(current === "dark" ? "light" : "dark");
+          var next = current === "dark" ? "light" : "dark";
+          try { localStorage.setItem("tdev:theme", next); } catch (e) {}
+          applyTheme(next);
         });
       }
 

@@ -11,7 +11,11 @@
   <script>
     (function () {
       try {
-        if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        var stored = localStorage.getItem("tdev:theme");
+        var dark = stored
+          ? stored === "dark"
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        if (dark) {
           // Page chrome AND the embedded Refine panel follow the same switch on
           // this showcase page (data-tl-theme drives the panel + its portals).
           document.documentElement.setAttribute("data-theme", "dark");
@@ -2252,7 +2256,7 @@
       line-height: 24.2px; color: var(--text-muted);
     }
     @media (max-width: 639px) {
-      .app { padding: 0 20px 48px; }
+      .app { padding: 0 12px 48px; }
       .header { height: auto; padding-top: 24px; padding-bottom: 32px; }
     }
     @media (max-width: 640px) {
@@ -2444,9 +2448,13 @@
       var html = document.documentElement;
       var iconStack = document.getElementById("theme-icon-stack");
       var userOverride = false;
+      try { userOverride = !!localStorage.getItem("tdev:theme"); } catch (e) {}
       function currentSystemTheme() {
         return (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches)
           ? "dark" : "light";
+      }
+      function storedTheme() {
+        try { return localStorage.getItem("tdev:theme"); } catch (e) { return null; }
       }
       function applyTheme(next) {
         if (next === "dark") html.setAttribute("data-theme", "dark");
@@ -2459,14 +2467,16 @@
           iconStack.setAttribute("data-active", next === "dark" ? "sun" : "moon");
         }
       }
-      applyTheme(currentSystemTheme());
+      applyTheme(storedTheme() || currentSystemTheme());
       if (iconStack) iconStack.classList.add("no-anim");
       var themeBtn = document.getElementById("theme-toggle");
       if (themeBtn) {
         themeBtn.addEventListener("click", function () {
           userOverride = true;
           var current = html.getAttribute("data-theme") === "dark" ? "dark" : "light";
-          applyTheme(current === "dark" ? "light" : "dark");
+          var next = current === "dark" ? "light" : "dark";
+          try { localStorage.setItem("tdev:theme", next); } catch (e) {}
+          applyTheme(next);
         });
       }
       if (window.matchMedia) {

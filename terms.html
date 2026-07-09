@@ -37,12 +37,16 @@
   />
 
   <script>
-    // Apply theme from system preference before first paint to avoid FOUC.
+    // Apply theme before first paint to avoid FOUC: a theme chosen via the
+    // toggle on other pages (persisted to localStorage as "tdev:theme")
+    // wins over system preference so it carries across the site.
     (function () {
       try {
-        if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-          document.documentElement.setAttribute("data-theme", "dark");
-        }
+        var stored = localStorage.getItem("tdev:theme");
+        var dark = stored
+          ? stored === "dark"
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        if (dark) document.documentElement.setAttribute("data-theme", "dark");
       } catch (e) {}
     })();
   </script>

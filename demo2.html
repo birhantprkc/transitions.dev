@@ -95,13 +95,16 @@
     }
   </script>
   <script>
-    // Apply theme from system preference before first paint to avoid FOUC.
-    // Session-only toggle overrides this (see end of <body>); not persisted.
+    // Apply theme before first paint to avoid FOUC: a manually chosen theme,
+    // persisted to localStorage by the toggle (see end of <body>), wins over
+    // system preference so it carries across reloads and other pages.
     (function () {
       try {
-        if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-          document.documentElement.setAttribute("data-theme", "dark");
-        }
+        var stored = localStorage.getItem("tdev:theme");
+        var dark = stored
+          ? stored === "dark"
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        if (dark) document.documentElement.setAttribute("data-theme", "dark");
       } catch (e) {}
     })();
   </script>
@@ -2083,8 +2086,8 @@
     }
 
     @media (max-width: 639px) {
-      .app { padding: 0 20px 48px; }
-      .top-bar { right: 20px; top: 12px; }
+      .app { padding: 0 12px 48px; }
+      .top-bar { right: 12px; top: 12px; }
       .header {
         height: auto;
         min-height: 180px;
@@ -2098,7 +2101,7 @@
          the desktop layout uses a hardcoded <br/> after "that" which
          produces awkward extra breaks on mobile. */
       .subtitle br { display: none; }
-      /* Cards span the full available width (viewport − 20px margins)
+      /* Cards span the full available width (viewport − 12px margins)
          instead of the fixed 320px desktop width. */
       .cards { grid-template-columns: 1fr; }
       /* Compensate for mobile browsers down-sampling the backing
@@ -3549,12 +3552,13 @@ function readMs(name, fallback) {
     (function () {
       /* ── Theme toggle ──────────────────────────────────────── */
       /* Default theme follows system settings (see inline script in <head>).
-         The toggle below provides a session-only override; nothing is persisted
-         across reloads. If the OS theme changes while the page is open and the
-         user hasn't manually toggled this session, we mirror the OS change. */
+         A manual toggle is persisted to localStorage ("tdev:theme") so it
+         carries across reloads and other pages on the site. Until the user
+         overrides it, OS theme changes are mirrored live. */
       var html = document.documentElement;
       var iconStack = document.getElementById("theme-icon-stack");
       var userOverride = false;
+      try { userOverride = !!localStorage.getItem("tdev:theme"); } catch (e) {}
 
       function currentSystemTheme() {
         return (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches)
@@ -3598,11 +3602,12 @@ function readMs(name, fallback) {
         toggle.addEventListener("click", function () {
           var next = html.getAttribute("data-theme") === "dark" ? "light" : "dark";
           userOverride = true;
+          try { localStorage.setItem("tdev:theme", next); } catch (e) {}
           applyTheme(next, true);
         });
       }
 
-      // Follow OS theme changes unless the user has toggled this session.
+      // Follow OS theme changes unless the user has manually overridden it.
       if (window.matchMedia) {
         var mql = window.matchMedia("(prefers-color-scheme: dark)");
         var onSystemChange = function (e) {
