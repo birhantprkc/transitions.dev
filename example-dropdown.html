@@ -493,14 +493,18 @@
     /* ── "Generic AI output" mode ─────────────────────────────────── */
     @media (prefers-reduced-motion: no-preference) {
       /* Dropdown — 85% start scale is intentionally too small; it pops
-         instead of feeling locked to the trigger. */
+         instead of feeling locked to the trigger. Drive the open/close scale
+         through the recipe VARS (not a literal scale(0.85)) so the hooks stay
+         live and Refine can raise them to the skill's 0.97 / 0.99 on apply. */
       body[data-style="generic"] .proto-root .t-dropdown {
-        transform: scale(0.85);
+        --dropdown-pre-scale: 0.85;
+        --dropdown-closing-scale: 0.85;
+        transform: scale(var(--dropdown-pre-scale));
         opacity: 0;
         transition: transform 205ms ease, opacity 205ms ease;
       }
       body[data-style="generic"] .proto-root .t-dropdown.is-open { transform: scale(1); opacity: 1; }
-      body[data-style="generic"] .proto-root .t-dropdown.is-closing { transform: scale(0.85); opacity: 0; }
+      body[data-style="generic"] .proto-root .t-dropdown.is-closing { transform: scale(var(--dropdown-closing-scale)); opacity: 0; }
 
       /* Keep tabs/pill snappy in the bad example. */
       body[data-style="generic"] .proto-root .dd-tabs-pill,

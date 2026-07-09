@@ -2602,16 +2602,53 @@
     // translateVarName?}. A var-backed blur is reported even at 0px — the var is
     // how an ADDED blur (recipe lane the source lacks) goes live. Only meaningful
     // for transform/filter lanes.
-    function readElValueHint(el, property){
+    // Direction regex for a phase — used to disambiguate an element that carries
+    // MORE THAN ONE var-backed value across its state rules (e.g. a menu dropdown
+    // whose base rests at scale(var(--dropdown-pre-scale)) but whose transient
+    // `.is-closing` rests at scale(var(--dropdown-closing-scale))). Open and close
+    // are the SAME element, so element-only var discovery would collapse both
+    // phases onto whichever scale var it happened to pick first — writing e.g.
+    // close's 0.99 into --dropdown-pre-scale and never touching the close var.
+    // The phase's own direction (open vs close, from its name/state tokens) lets
+    // us prefer the candidate whose CSS state-class matches that direction.
+    function phaseDirRe(ph){
+      if(!ph)return null;
+      const t=((ph.phase||"")+" "+(ph.toState||"")+" "+(ph.fromState||"")).toLowerCase();
+      // check CLOSE first: a close phase's fromState is often the OPEN state, so
+      // its token string contains "open" too — the closing intent must win.
+      if(/clos|exit|hide|collaps|dismiss|leave|out\b/.test(t))return /clos|exit|hide|collaps|dismiss|leave|out/;
+      if(/open|reveal|show|enter|expand|\bin\b/.test(t))return /open|reveal|show|enter|expand/;
+      return null;
+    }
+    // phaseHint (optional): {phase,toState,fromState} — makes var discovery
+    // direction-aware so each phase of a grouped open/close binds to ITS OWN
+    // backing var. Absent → the classic "furthest-from-rest, any state" behavior.
+    function readElValueHint(el, property, phaseHint){
       const out={};
       try{
         if(!el||(property!=="transform"&&property!=="filter"))return out;
         const own=(typeof el.className==="string"?el.className.trim().split(/\s+/):Array.from(el.classList||[])).filter(Boolean);
+        const ownSet=new Set(own);
         const cs=getComputedStyle(el);
         const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
         const tokRes=own.map(c=>new RegExp("\\."+esc(c)+"(?![\\w-])"));
         const matchTok=sel=>!own.length||tokRes.some(re=>re.test(sel));
-        let bestScale=null,bestBlur=null,bestTranslate=null;
+        // state classes a rule's subject compound carries beyond the element's own
+        // classes (e.g. `.t-dropdown.is-closing` → ["is-closing"] for a #dropdown
+        // whose own classes are t-dropdown/dropdown). Empty → a base/stateless rule.
+        const extraStateClasses=sel=>{
+          for(const part of String(sel).split(",")){
+            const s=part.trim();if(!s)continue;
+            const compounds=s.split(/\s*[>+~]\s*|\s+/).filter(Boolean);
+            let subject=null;
+            for(let i=compounds.length-1;i>=0;i--){if(tokRes.some(re=>re.test(compounds[i]))){subject=compounds[i];break;}}
+            if(!subject)continue;
+            return (subject.match(/\.[-\w]+/g)||[]).map(c=>c.slice(1)).filter(c=>!ownSet.has(c));
+          }
+          return [];
+        };
+        // candidate lists — one entry per matching rule that declares the value.
+        const scaleCands=[],blurCands=[],translateCands=[];
         // custom-property definitions seen on matching rules — lets a var chain
         // resolve to its token var (--t-page-from-x: calc(var(--page-slide-distance)
         // * -1) → --page-slide-distance), which is the var shared across members.
@@ -2620,50 +2657,69 @@
         const rootVar=(name)=>{let n=name,guard=0;
           while(guard++<4){const def=varDefs.get(n);const nm=def&&def.match(/var\(\s*(--[\w-]+)/);if(!nm)break;n=nm[1];}
           return n;};
-        const texts=[];
+        const rules=[];
         const collect=list=>{for(const rule of Array.from(list||[])){
           if(rule.cssRules&&rule.selectorText===undefined){collect(rule.cssRules);continue;}
           const sel=rule.selectorText;if(!sel||!matchTok(sel))continue;
-          if(rule.cssText)texts.push(rule.cssText);}};
+          if(rule.cssText)rules.push({sel,txt:rule.cssText});}};
         for(const sheet of Array.from(document.styleSheets||[])){let r;try{r=sheet.cssRules;}catch{continue;}collect(r);}
-        for(const txt of texts){const defRe=/(--[\w-]+)\s*:\s*([^;}]+)/g;let dm;
+        for(const{txt} of rules){const defRe=/(--[\w-]+)\s*:\s*([^;}]+)/g;let dm;
           while((dm=defRe.exec(txt)))if(!varDefs.has(dm[1]))varDefs.set(dm[1],dm[2].trim());}
-        for(const txt of texts){
+        for(const{sel,txt} of rules){
+          const st=extraStateClasses(sel);
           if(property==="transform"){
             const tm=txt.match(/transform\s*:\s*([^;}]+)/i);
             if(tm){const sc=tm[1].match(/scale\(\s*([^),]+)/i);
               if(sc){const inner=sc[1].trim();const vm=inner.match(/var\(\s*(--[\w-]+)/);
                 const num=vm?parseFloat(cs.getPropertyValue(vm[1])):parseFloat(inner);
-                // pick the value furthest from the resting 1 (the real pre-scale);
-                // a var-backed scale at rest (1) still reports its var — the hook
-                // for ADDING a start-scale the source neutralized (e.g. icon swap).
-                if(Number.isFinite(num)&&(Math.abs(num-1)>1e-4||vm)){
-                  const better=!bestScale||Math.abs(num-1)>Math.abs(bestScale.scale-1)||(bestScale.varName==null&&vm);
-                  if(better)bestScale={scale:num,...(vm?{varName:vm[1]}:{})};}}
+                // a var-backed scale at rest (1) still counts — the hook for ADDING
+                // a start-scale the source neutralized (e.g. icon swap).
+                if(Number.isFinite(num)&&(Math.abs(num-1)>1e-4||vm))
+                  scaleCands.push({scale:num,st,...(vm?{varName:vm[1]}:{})});}
               const tr=tm[1].match(/translate(?:X|Y|3d)?\(\s*([^),]+)/i);
               if(tr){const inner=tr[1].trim();const vm=inner.match(/var\(\s*(--[\w-]+)/);
                 const vn=vm?rootVar(vm[1]):null;
                 // distance is a magnitude — direction lives in the CSS (± calc).
                 const num=Math.abs(vn?parseFloat(cs.getPropertyValue(vn)):parseFloat(inner));
-                // a var-backed translate at rest (0) still reports its var — the
-                // hook for ADDING a slide distance the source neutralized (e.g. a
-                // generic text swap with --text-swap-translate-y: 0).
-                if(Number.isFinite(num)&&(num>1e-4||vn)){
-                  const better=!bestTranslate||num>bestTranslate.translate||(bestTranslate.translateVarName==null&&vn);
-                  if(better)bestTranslate={translate:num,...(vn?{translateVarName:vn}:{})};}}}
+                // a var-backed translate at rest (0) still counts — the hook for
+                // ADDING a slide the source neutralized (e.g. a generic text swap).
+                if(Number.isFinite(num)&&(num>1e-4||vn))
+                  translateCands.push({translate:num,st,...(vn?{translateVarName:vn}:{})});}}
           }else{
             const fm=txt.match(/filter\s*:\s*([^;}]+)/i);
             if(fm){const bl=fm[1].match(/blur\(\s*([^)]+)\)/i);
               if(bl){const inner=bl[1].trim();const vm=inner.match(/var\(\s*(--[\w-]+)/);
                 const num=vm?parseFloat(cs.getPropertyValue(vm[1])):parseFloat(inner);
-                // var-backed 0px still reports the var (the hook for ADDING blur).
-                if(Number.isFinite(num)&&(num>1e-4||vm)&&(!bestBlur||num>bestBlur.blur))
-                  bestBlur={blur:num,...(vm?{varName:vm[1]}:{})};}}
+                // var-backed 0px still counts (the hook for ADDING blur).
+                if(Number.isFinite(num)&&(num>1e-4||vm))
+                  blurCands.push({blur:num,st,...(vm?{varName:vm[1]}:{})});}}
           }
         }
-        if(bestScale)Object.assign(out,bestScale);
-        if(bestBlur)Object.assign(out,bestBlur);
-        if(bestTranslate)Object.assign(out,bestTranslate);
+        const dirRe=phaseDirRe(phaseHint);
+        // Choose a candidate: furthest-from-rest wins, a var-backed one beats a
+        // literal. `key` is the magnitude field (scale→|x-1|, blur/translate→x).
+        const pick=(cands,restVal)=>{let best=null;for(const c of cands){
+          const mag=restVal===1?Math.abs(c.scale-1):(c.blur!=null?c.blur:c.translate);
+          const bmag=best==null?-1:(restVal===1?Math.abs(best.scale-1):(best.blur!=null?best.blur:best.translate));
+          const cVar=c.varName||c.translateVarName, bVar=best&&(best.varName||best.translateVarName);
+          if(best==null||mag>bmag||(!bVar&&cVar))best=c;}return best;};
+        // Direction-aware selection (only when we know the phase): prefer a
+        // candidate on a state rule matching the phase direction; else a
+        // base/stateless rule; else fall back to the global best (classic path).
+        const choose=(cands,restVal)=>{
+          if(!cands.length)return null;
+          if(phaseHint){
+            if(dirRe){const m=cands.filter(c=>c.st.some(cl=>dirRe.test(cl)));if(m.length)return pick(m,restVal);}
+            const base=cands.filter(c=>!c.st.length);if(base.length)return pick(base,restVal);
+          }
+          return pick(cands,restVal);
+        };
+        const bestScale=choose(scaleCands,1);
+        const bestBlur=choose(blurCands,0);
+        const bestTranslate=choose(translateCands,0);
+        if(bestScale){const{st,...rest}=bestScale;Object.assign(out,rest);}
+        if(bestBlur){const{st,...rest}=bestBlur;Object.assign(out,rest);}
+        if(bestTranslate){const{st,...rest}=bestTranslate;Object.assign(out,rest);}
       }catch{}
       return out;
     }
@@ -2729,10 +2785,10 @@
     const TL_LP_GUARD_PHASE_ID="tl-live-none-guard-phase";
     // Same, resolving the element from a CSS selector (used when only a lane's
     // selector is known, e.g. a grouped phase member).
-    function laneValueHint(selector, property){
+    function laneValueHint(selector, property, phaseHint){
       if(!selector||(property!=="transform"&&property!=="filter"))return {};
       let el=null;try{el=document.querySelector(selector);}catch{return {};}
-      return el?readElValueHint(el,property):{};
+      return el?readElValueHint(el,property,phaseHint):{};
     }
 
     // ── hooks ──
@@ -4863,7 +4919,10 @@
         refineCacheRef.current.delete(active.id+"::"+type);
         // attach the lane's non-resting scale/blur/translate value (+ backing var)
         // so the agent can refine transform/filter VALUES too.
-        const withVal=(t)=>{const v=laneValueHint(t.selector,t.property);return {property:t.property,member:t.member||null,durationMs:t.durationMs,delayMs:t.delayMs,easing:t.easing,
+        // direction-aware per phase — see readElValueHint/phaseDirRe: a grouped
+        // open/close shares one element, so each phase's value must be read with
+        // ITS OWN state context or both collapse onto one backing var.
+        const withVal=(phaseCtx)=>(t)=>{const v=laneValueHint(t.selector,t.property,phaseCtx);return {property:t.property,member:t.member||null,durationMs:t.durationMs,delayMs:t.delayMs,easing:t.easing,
           ...(v.scale!=null?{scale:v.scale}:{}),...(v.blur!=null?{blur:v.blur}:{}),...(v.varName?{varName:v.varName}:{}),
           ...(v.translate!=null?{translate:v.translate}:{}),...(v.translateVarName?{translateVarName:v.translateVarName}:{})};};
         try{
@@ -4884,12 +4943,12 @@
                 const ret=rep.effectiveTimings||[];
                 const sel=(ret[0]&&ret[0].selector)||null;
                 const ph=gp.length>1?gp.map(x=>({phase:x.phase||x.phaseLabel||"phase",label:x.phaseLabel||x.phase||"Phase",
-                  timings:(x.effectiveTimings||[]).map(withVal)})):undefined;
-                transitions.push({transitionId:rep.id,label:rep.groupLabel||rep.label,selector:sel,timings:ret.map(withVal),phases:ph});
+                  timings:(x.effectiveTimings||[]).map(withVal(x))})):undefined;
+                transitions.push({transitionId:rep.id,label:rep.groupLabel||rep.label,selector:sel,timings:ret.map(withVal(rep)),phases:ph});
               }else{
                 const fet=e.effectiveTimings||[];
                 const sel=(e.bindings&&e.bindings.selector)||(fet[0]&&fet[0].selector)||null;
-                transitions.push({transitionId:e.id,label:e.label,selector:sel,timings:fet.map(withVal)});
+                transitions.push({transitionId:e.id,label:e.label,selector:sel,timings:fet.map(withVal(e))});
               }
             }
             const{id}=await relayCreateJob({scope:"all",label:"All transitions",mode,refineType:"replace",transitions});
@@ -4897,7 +4956,7 @@
             return;
           }
           const et=active.effectiveTimings||[];
-          const timings=et.map(withVal);
+          const timings=et.map(withVal(active));
           const selector=(active.bindings&&active.bindings.selector)||(et[0]&&et[0].selector)||null;
           // A recipe swap (replace) on a grouped phase should update its related
           // phases (open + close) together — they're one motion. Send the whole
@@ -4906,7 +4965,7 @@
           if(type==="replace"&&active.kind==="phase"&&active.groupId){
             const gp=entries.filter(e=>e.kind==="phase"&&e.groupId===active.groupId);
             if(gp.length>1)phases=gp.map(e=>({phase:e.phase||e.phaseLabel||"phase",label:e.phaseLabel||e.phase||"Phase",
-              timings:(e.effectiveTimings||[]).map(withVal)}));
+              timings:(e.effectiveTimings||[]).map(withVal(e))}));
           }
           const{id}=await relayCreateJob({transitionId:active.id,label:active.label,selector,
             phase:active.phase||null,group:active.groupLabel||null,timings,mode,refineType:type,scope:"selected",phases});
@@ -5088,6 +5147,10 @@
             delayMs:p.delayMs??pt.delayMs??(base&&base.delayMs)??0,
             easing:p.easing??pt.easing??(base&&base.easing)??"ease",
           });
+          // direction context so var discovery binds this patch to the phase's
+          // OWN backing var (open→--dropdown-pre-scale, close→--dropdown-closing-scale)
+          // even though open+close share one element.
+          const phaseHint={phase:p.phase||target.phase,toState:target.toState,fromState:target.fromState};
           const applyValue=(prop,mk)=>{
             // mk(lane, hint) → override fields for one lane, or null to skip.
             let vLanes=lanes.filter(t=>t.property===prop);
@@ -5095,7 +5158,7 @@
             if(vLanes.length){
               const rt=recipeTiming();
               for(const lane of vLanes){
-                const hint=laneValueHint(lane.selector,prop);
+                const hint=laneValueHint(lane.selector,prop,phaseHint);
                 const ov=mk(lane,hint);
                 // an EXISTING lane the recipe reuses (e.g. Page side-by-side's
                 // filter lane at the source's 300ms) must ALSO adopt the recipe's
@@ -5108,7 +5171,7 @@
             // A new filter lane rides the transform (slide) timing per the skill.
             const sib=sibling(prop==="filter"?"transform":"opacity");
             if(!sib)return;
-            const hint=laneValueHint(sib.selector,prop);
+            const hint=laneValueHint(sib.selector,prop,phaseHint);
             const ov=mk(null,hint);
             if(!ov)return;
             const laneId=(sib.memberId?sib.memberId+"::":"")+prop;
