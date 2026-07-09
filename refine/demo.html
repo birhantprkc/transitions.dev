@@ -1266,7 +1266,7 @@
       background: #fff; color: var(--c-text);
       font-family: "Inter", system-ui, -apple-system, sans-serif;
     }
-    /* header: title block (left) + Agent/Deterministic mode dropdown (right) */
+    /* header: title block (left) + scan-scope dropdown (right, Replace tab only) */
     /* match the timeline top bar exactly: 7.5px/14px padding, centered, 52px tall (36px row + 15 + 1px border) */
     .tl-refine-head { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
       gap: 8px; box-sizing: border-box; padding: 7.5px 7.5px 7.5px 14px;
@@ -1635,7 +1635,7 @@
       filter: blur(var(--text-swap-blur)); opacity: 0; }
     .t-text-swap.is-enter-start { transform: translateY(var(--text-swap-translate-y));
       filter: blur(var(--text-swap-blur)); opacity: 0; transition: none; }
-    /* mode dropdown rows (Agent / Deterministic) */
+    /* scope dropdown rows (Selected transition / All transitions) */
     .tl-mode-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 12px;
       border: none; background: transparent; border-radius: 8px; cursor: pointer; text-align: left;
       font: inherit; transition: background 0.12s ease; }
@@ -3109,9 +3109,11 @@
       return r.json();
     }
 
-    const REFINE_MODES=[
-      {key:"llm",label:"Agent",desc:"Suggested edits from the agent using the Transitions.dev skill."},
-      {key:"deterministic",label:"Deterministic",desc:"Suggests edits only mathematically, with no credit usage."},
+    // Scan SCOPE (Replace tab only): scan just the selected transition, or every
+    // detected transition and propose a replacement for each good recipe match.
+    const REFINE_SCOPES=[
+      {key:"selected",label:"Selected transition",desc:"Scan only the transition you have selected."},
+      {key:"all",label:"All transitions",desc:"Scan every detected transition and suggest a replacement for each good recipe match."},
     ];
     const REFINE_TYPES=[
       {key:"small",label:"Small refinements",desc:"The agent will scan the transition and suggest small refinements by adjusting motion tokens using the Transitions.dev skill."},
@@ -3268,7 +3270,12 @@
             // top row: member chip + property, or a single heading for replace cards
             h("div",{className:"tl-sug-head"},
               isReplace
-                ? h("span",{className:"tl-sug-prop"},s.title||"Transition replacement")
+                ? h(React.Fragment,null,
+                    // "All transitions" scope tags each replace card with the
+                    // transition/component it targets so a multi-suggestion list
+                    // is legible; single-scope replaces omit it.
+                    s._targetLabel&&h("span",{className:"tl-sug-member"},s._targetLabel),
+                    h("span",{className:"tl-sug-prop"},s.title||"Transition replacement"))
                 : h(React.Fragment,null,
                     member&&h("span",{className:"tl-sug-member"},member),
                     prop&&h("span",{className:"tl-sug-prop"},prop))),
@@ -3333,14 +3340,15 @@
         onReconnect&&h("button",{className:"tl-gate-recheck",disabled:rechecking,onClick:recheck},
           rechecking?(relayDown?"Retrying…":"Reconnecting…"):(relayDown?"Retry connection":"Reconnect agent")));
     }
-    function RefinePanel({open,onClose,phase,label,refineType,onType,suggestions,summary,error,appliedIds,onApply,onApplyAll,mode,onMode,llmAvailable,cliInstalled,relayDown,agentReason,onReconnect,onStart,lanes,resolvedTheme}){
+    function RefinePanel({open,onClose,phase,label,refineType,onType,suggestions,summary,error,appliedIds,onApply,onApplyAll,scope,onScope,llmAvailable,cliInstalled,relayDown,agentReason,onReconnect,onStart,lanes,resolvedTheme}){
       // mount-on-open; keep mounted through the panel-reveal slide-out, then unmount
       const[render,setRender]=useState(open);
       const[panelOpen,setPanelOpen]=useState(false);
       const[slidePhase,setSlidePhase]=useState("opening");
-      const[modeOpen,setModeOpen]=useState(false);
+      // scope selector dropdown (Replace tab only)
+      const[scopeOpen,setScopeOpen]=useState(false);
       const[statusIx,setStatusIx]=useState(0);
-      const modeRef=useRef(null);
+      const scopeRef=useRef(null);
       // The results reveal should play once per scan, not on every tab switch.
       // This persists across RefineResults remounts; reset it when a new scan
       // starts (or the panel returns to idle) so fresh results animate again.
@@ -3365,10 +3373,10 @@
       // close on Escape — dismiss the mode dropdown first if it's open
       useEffect(()=>{
         if(!open)return;
-        const onKey=e=>{if(e.key!=="Escape")return;if(modeOpen){setModeOpen(false);return;}onClose();};
+        const onKey=e=>{if(e.key!=="Escape")return;if(scopeOpen){setScopeOpen(false);return;}onClose();};
         window.addEventListener("keydown",onKey);
         return()=>window.removeEventListener("keydown",onKey);
-      },[open,onClose,modeOpen]);
+      },[open,onClose,scopeOpen]);
       // cycle the in-progress status copy while scanning (matches the design's
       // "Scanning… → Reading the Transitions.dev skill → Suggesting edits").
       useEffect(()=>{
@@ -3402,15 +3410,11 @@
       // Replace transition → kind "replace"; Small refinements → token tweaks.
       const visible = suggestions.filter(s=> refineType==="replace" ? s.kind==="replace" : s.kind!=="replace");
       const pending = visible.filter(s=>!appliedIds[s.id]);
-      const agentMode = mode==="llm";
       // null (unknown / still probing) is treated as ready so the panel doesn't
-      // flash the "unavailable" copy before /health resolves.
-      const agentReady = !agentMode || llmAvailable!==false;
-      const modeLabel = (REFINE_MODES.find(m=>m.key===mode)||REFINE_MODES[0]).label;
-      // Idle empty-state copy is mode-aware (computed per type in bodyFor):
-      // Agent (llm) keeps the type's agent-oriented desc; Deterministic has no
-      // agent, so it describes the math-snap behavior (and that "replace" needs
-      // Agent mode).
+      // flash the "unavailable" copy before /health resolves. All scanning goes
+      // through the agent now, so readiness is purely "is a live agent wired".
+      const agentReady = llmAvailable!==false;
+      const scopeLabel = (REFINE_SCOPES.find(s=>s.key===scope)||REFINE_SCOPES[0]).label;
       // One persistent control for the whole foot: in idle/done/error it's the
       // pill button; while scanning it carries `.is-scanning` and the same DOM
       // node morphs (card resize) into the loading rectangle with the border-beam.
@@ -3467,9 +3471,7 @@
             h("div",{className:"tl-refine-unavail-title"},"Connect with your agent"),
             h(AgentConnectBody,{cliMissing:cliInstalled===false,relayDown,reason:agentReason,onReconnect}));
         }
-        const idleDescR = agentMode ? (REFINE_TYPES.find(t=>t.key===rt)||REFINE_TYPES[0]).desc : (rt==="replace"
-          ? "Deterministic mode can't pick a recipe to replace the transition — switch to Agent mode for replacements."
-          : "Deterministic mode snaps your transition's timing to the nearest Transitions.dev motion tokens — mathematically, with no agent or credits.");
+        const idleDescR = (REFINE_TYPES.find(t=>t.key===rt)||REFINE_TYPES[0]).desc;
         return h("div",{className:"tl-refine-center"},
           h("p",{className:"tl-refine-idle-text"},idleDescR));
       };
@@ -3534,19 +3536,22 @@
               h("h3",null,"Refine"),
               h("p",null,label||"Transitions review")),
             h("div",{className:"tl-refine-actions"},
-              h("button",{ref:modeRef,className:cx("tl-refine-mode",modeOpen&&"is-open"),
-                "aria-haspopup":"menu","aria-expanded":modeOpen?"true":"false",onClick:()=>setModeOpen(v=>!v)},
-                h("span",null,modeLabel),
+              // Scan-scope selector — Replace tab only (Small refinements always
+              // scan just the selected transition). Same control the Agent/
+              // Deterministic mode dropdown used to be.
+              refineType==="replace"&&h("button",{ref:scopeRef,className:cx("tl-refine-mode",scopeOpen&&"is-open"),
+                "aria-haspopup":"menu","aria-expanded":scopeOpen?"true":"false",onClick:()=>setScopeOpen(v=>!v)},
+                h("span",null,scopeLabel),
                 h(Ic,{name:"chevron",size:16})),
               h("button",{className:"tl-refine-close","aria-label":"Close refine panel",onClick:onClose},
                 h(Ic,{name:"close",size:16})))),
-          h(Dropdown,{open:modeOpen,onClose:()=>setModeOpen(false),triggerRef:modeRef,width:276,align:"right"},
-            REFINE_MODES.map(m=>h("button",{key:m.key,className:"tl-mode-row",
-              onClick:()=>{if(m.key!==mode)onMode(m.key);setModeOpen(false);}},
+          refineType==="replace"&&h(Dropdown,{open:scopeOpen,onClose:()=>setScopeOpen(false),triggerRef:scopeRef,width:276,align:"right"},
+            REFINE_SCOPES.map(sc=>h("button",{key:sc.key,className:"tl-mode-row",
+              onClick:()=>{if(sc.key!==scope)onScope(sc.key);setScopeOpen(false);}},
               h("div",{className:"tl-mode-row-main"},
-                h("div",{className:"tl-mode-row-title"},m.label),
-                h("div",{className:"tl-mode-row-desc"},m.desc)),
-              (mode===m.key)&&h("span",{className:"tl-mode-row-check"},h(Ic,{name:"accept",size:16}))))),
+                h("div",{className:"tl-mode-row-title"},sc.label),
+                h("div",{className:"tl-mode-row-desc"},sc.desc)),
+              (scope===sc.key)&&h("span",{className:"tl-mode-row-check"},h(Ic,{name:"accept",size:16}))))),
           h("div",{className:"tl-refine-tabs",role:"tablist","aria-label":"Refinement type"},
             REFINE_TYPES.map(t=>h("button",{key:t.key,className:"tl-refine-tab",role:"tab",
               "aria-selected":refineType===t.key?"true":"false",
@@ -4625,10 +4630,7 @@
       const[refineSuggestions,setRefineSuggestions]=useState([]);
       const[refineSummary,setRefineSummary]=useState(null);
       const[refineError,setRefineError]=useState(null);
-      // deterministic scans answer almost instantly, so enforce a 2s floor on the
-      // "scanning" phase for that mode only (LLM scans stay immediate).
       const scanStartedAtRef=useRef(0);
-      const scanModeRef=useRef("llm");
       // ── accept (write to source) ──
       const[acceptState,setAcceptState]=useState("idle"); // idle | saving | done | error
       const[acceptError,setAcceptError]=useState(null);
@@ -4659,7 +4661,12 @@
       const GROUP_SCAN_MAX_RETRIES=2;
       const[refineLabel,setRefineLabel]=useState(null);
       const[appliedIds,setAppliedIds]=useState({});
-      const[refineMode,setRefineMode]=useState("llm"); // llm (Agent) | deterministic
+      // scan SCOPE for the Replace tab — "selected" (only the active transition)
+      // or "all" (every detected transition). Persisted like the tab/theme prefs;
+      // defaults to "selected". Small refinements always scan just the selection.
+      const[refineScope,setRefineScope]=useState(()=>{
+        try{const v=localStorage.getItem("tl-refine-scope-pref");return v==="all"?"all":"selected";}catch{return "selected";}
+      });
       // small | replace — last selected tab persists (same pattern as tl-theme-pref)
       const[refineType,setRefineType]=useState(()=>{
         try{const v=localStorage.getItem("tl-refine-tab-pref");return v==="small"||v==="replace"?v:"small";}catch{return "small";}
@@ -4754,10 +4761,9 @@
       },[active,refineOpen,refreshHealth]);
       // "Start scanning" resolves availability first, then posts the job.
       // per-(transition,type) result cache so switching tabs reuses a prior scan
-      // instead of re-asking the agent. In llm mode each scan is scoped to the
-      // active tab (Small = token tweaks, Replace = recipe) so the common Small
-      // view skips the recipe selection + reference-file read. Deterministic stays
-      // a single instant "both" pass that feeds both tabs.
+      // instead of re-asking the agent. Each scan is scoped to the active tab
+      // (Small = token tweaks, Replace = recipe) so the common Small view skips
+      // the recipe selection + reference-file read.
       const refineCacheRef=useRef(new Map());     // `${id}::${type}` -> {suggestions,summary}
       const refineScanTypeRef=useRef("small");    // which type the in-flight job targets
       // results are not comparable across transitions — drop the cache when the
@@ -4776,64 +4782,96 @@
       const startScan=useCallback(async(typeArg,opts)=>{
         if(!active)return;
         opts=opts||{};
-        // Resolve availability from the continuously-polled /health (2s cadence)
-        // rather than a serial probe on the click path. Unknown (null) counts as
-        // available so the first click isn't blocked; a dead relay surfaces via
-        // the POST below (→ error state).
-        const avail=llmAvailable!==false;
-        const mode=(refineMode==="llm"&&!avail)?"deterministic":refineMode;
-        if(mode!==refineMode)setRefineMode(mode);
-        scanModeRef.current=mode;
-        // deterministic → one "both" pass (instant, free). llm → scope to the
-        // active tab so Small skips recipe work; Replace asks for it on demand.
-        // NOTE: this is also wired as a button onClick, so typeArg may be a click
-        // event — only honour it when it's an explicit "small"/"replace" string.
+        // All scanning goes through the agent now (the deterministic path is gone).
+        // Availability is resolved from the continuously-polled /health; unknown
+        // (null) counts as available so the first click isn't blocked, and a dead
+        // relay surfaces via the POST below (→ error state).
+        const mode="llm";
+        // NOTE: also wired as a button onClick, so typeArg may be a click event —
+        // only honour it when it's an explicit "small"/"replace" string.
         const reqType=(typeArg==="small"||typeArg==="replace")?typeArg:refineType;
-        const type=mode==="deterministic"?"both":reqType;
+        const type=reqType;
+        // Scope only applies to the Replace tab — Small always scans the selection.
+        const scope=(reqType==="replace")?refineScope:"selected";
         refineScanTypeRef.current=type;
         scanStartedAtRef.current=Date.now();
         setRefinePhase("scanning");setRefineLog([]);setRefineError(null);
-        setRefineLabel(active.label);setRefineJobId(null);
+        setRefineLabel(scope==="all"?"All transitions":active.label);setRefineJobId(null);
         if(!opts.keepApplied)setAppliedIds({});
         // re-scan only this type; keep the other tab's cached result for the merge.
         refineCacheRef.current.delete(active.id+"::"+type);
+        // attach the lane's non-resting scale/blur/translate value (+ backing var)
+        // so the agent can refine transform/filter VALUES too.
+        const withVal=(t)=>{const v=laneValueHint(t.selector,t.property);return {property:t.property,member:t.member||null,durationMs:t.durationMs,delayMs:t.delayMs,easing:t.easing,
+          ...(v.scale!=null?{scale:v.scale}:{}),...(v.blur!=null?{blur:v.blur}:{}),...(v.varName?{varName:v.varName}:{}),
+          ...(v.translate!=null?{translate:v.translate}:{}),...(v.translateVarName?{translateVarName:v.translateVarName}:{})};};
         try{
+          if(scope==="all"){
+            // Bundle EVERY detected transition — one per agent group (with its
+            // related open/close phases) plus each ungrouped flat entry — so the
+            // agent can return a LIST of replace suggestions, one per transition
+            // it finds a good recipe for. Each suggestion echoes its transitionId
+            // so Apply targets the right transition.
+            const seenGroup=new Set();
+            const transitions=[];
+            for(const e of entries){
+              if(e.kind==="phase"){
+                if(!e.groupId||seenGroup.has(e.groupId))continue;
+                seenGroup.add(e.groupId);
+                const gp=entries.filter(x=>x.kind==="phase"&&x.groupId===e.groupId);
+                const rep=gp[0]||e;
+                const ret=rep.effectiveTimings||[];
+                const sel=(ret[0]&&ret[0].selector)||null;
+                const ph=gp.length>1?gp.map(x=>({phase:x.phase||x.phaseLabel||"phase",label:x.phaseLabel||x.phase||"Phase",
+                  timings:(x.effectiveTimings||[]).map(withVal)})):undefined;
+                transitions.push({transitionId:rep.id,label:rep.groupLabel||rep.label,selector:sel,timings:ret.map(withVal),phases:ph});
+              }else{
+                const fet=e.effectiveTimings||[];
+                const sel=(e.bindings&&e.bindings.selector)||(fet[0]&&fet[0].selector)||null;
+                transitions.push({transitionId:e.id,label:e.label,selector:sel,timings:fet.map(withVal)});
+              }
+            }
+            const{id}=await relayCreateJob({scope:"all",label:"All transitions",mode,refineType:"replace",transitions});
+            setRefineJobId(id);
+            return;
+          }
           const et=active.effectiveTimings||[];
-          // attach the lane's non-resting scale/blur value (+ backing var) so the
-          // agent + deterministic engine can refine transform/filter VALUES too.
-          const withVal=(t)=>{const v=laneValueHint(t.selector,t.property);return {property:t.property,member:t.member||null,durationMs:t.durationMs,delayMs:t.delayMs,easing:t.easing,
-            ...(v.scale!=null?{scale:v.scale}:{}),...(v.blur!=null?{blur:v.blur}:{}),...(v.varName?{varName:v.varName}:{}),
-            ...(v.translate!=null?{translate:v.translate}:{}),...(v.translateVarName?{translateVarName:v.translateVarName}:{})};};
           const timings=et.map(withVal);
           const selector=(active.bindings&&active.bindings.selector)||(et[0]&&et[0].selector)||null;
-          // A recipe swap (replace/both) on a grouped phase should update its related
+          // A recipe swap (replace) on a grouped phase should update its related
           // phases (open + close) together — they're one motion. Send the whole
           // group's phases so the agent can return a per-phase `patches` array.
           let phases;
-          if((type==="replace"||type==="both")&&active.kind==="phase"&&active.groupId){
+          if(type==="replace"&&active.kind==="phase"&&active.groupId){
             const gp=entries.filter(e=>e.kind==="phase"&&e.groupId===active.groupId);
             if(gp.length>1)phases=gp.map(e=>({phase:e.phase||e.phaseLabel||"phase",label:e.phaseLabel||e.phase||"Phase",
               timings:(e.effectiveTimings||[]).map(withVal)}));
           }
           const{id}=await relayCreateJob({transitionId:active.id,label:active.label,selector,
-            phase:active.phase||null,group:active.groupLabel||null,timings,mode,refineType:type,phases});
+            phase:active.phase||null,group:active.groupLabel||null,timings,mode,refineType:type,scope:"selected",phases});
           setRefineJobId(id);
         }catch(e){
           setRefinePhase("error");
           setRefineError(h(React.Fragment,null,"Couldn't reach the refine relay. Start it with ",h("code",{className:"tl-code"},"npx transitions-refine live"),"."));
         }
-      },[active,refineMode,refineType,llmAvailable,entries]);
-      const changeRefineMode=useCallback((mode)=>{setRefineMode(mode);setRefinePhase("idle");refineCacheRef.current.clear();refreshHealth();},[refreshHealth]);
-      // Switching tabs reuses a cached scan when present; otherwise (llm only) the
-      // tab drops back to its idle state and waits for an explicit Start-scanning
-      // click — switching never auto-runs a scan. Deterministic feeds both tabs
-      // from one "both" pass, so its tab switch is a pure filter. Before any scan
-      // (idle/error), tabs just preview copy and never auto-scan.
+      },[active,refineScope,refineType,llmAvailable,entries]);
+      // Switching scope changes the Replace scan's shape (one transition vs all),
+      // so drop cached results and fall back to idle — the next scan uses the new
+      // scope. Persist the choice like the tab/theme prefs.
+      const changeRefineScope=useCallback((sc)=>{
+        setRefineScope(sc);
+        try{localStorage.setItem("tl-refine-scope-pref",sc);}catch{}
+        refineCacheRef.current.clear();
+        setRefinePhase(p=>(p==="done"||p==="error")?"idle":p);
+      },[]);
+      // Switching tabs reuses a cached scan when present; otherwise the tab drops
+      // back to its idle state and waits for an explicit Start-scanning click —
+      // switching never auto-runs a scan. Before any scan (idle/error), tabs just
+      // preview copy and never auto-scan.
       const changeRefineType=useCallback((t)=>{
         setRefineType(t);
         try{localStorage.setItem("tl-refine-tab-pref",t);}catch{}
         if(!active)return;
-        if(scanModeRef.current==="deterministic")return;
         if(refinePhase!=="done"&&refinePhase!=="scanning")return;
         if(refineCacheRef.current.has(active.id+"::"+t)){applyMerged(active.id);setRefinePhase("done");return;}
         // No cached result for this tab → show its idle scan button and wait for
@@ -4856,13 +4894,23 @@
                 // (so the other tab's cached suggestions stay visible).
                 const type=refineScanTypeRef.current;
                 const id=active?active.id:"";
-                refineCacheRef.current.set(id+"::"+type,{suggestions:(job.result&&job.result.suggestions)||[],summary:(job.result&&job.result.summary)||null});
-                if(active)applyMerged(active.id);else{setRefineSuggestions((job.result&&job.result.suggestions)||[]);setRefineSummary(job.result&&job.result.summary);}
+                // "All transitions" scope returns MANY replace suggestions, each
+                // carrying the `transitionId` it targets. Tag each with the target
+                // transition's label (for the card) and namespace its id by that
+                // transitionId so multiple replaces stay uniquely keyed for Apply.
+                const rawSugs=(job.result&&job.result.suggestions)||[];
+                const sugs=rawSugs.map((s,i)=>{
+                  if(s&&s.transitionId){
+                    const ent=entries.find(e=>e.id===s.transitionId);
+                    return {...s,id:s.transitionId+"::"+(s.id||s.kind||("sug"+i)),
+                      _targetLabel:ent?(ent.groupLabel||ent.label):null};
+                  }
+                  return s;
+                });
+                refineCacheRef.current.set(id+"::"+type,{suggestions:sugs,summary:(job.result&&job.result.summary)||null});
+                if(active)applyMerged(active.id);else{setRefineSuggestions(sugs);setRefineSummary(job.result&&job.result.summary);}
                 setRefinePhase("done");};
-              // deterministic mode floors the scanning phase at 2s so it doesn't flash by.
-              const minMs=scanModeRef.current==="deterministic"?2000:0;
-              const wait=Math.max(0,minMs-(Date.now()-scanStartedAtRef.current));
-              if(wait>0){to=setTimeout(finish,wait);}else{finish();}
+              finish();
               return;
             }
             if(job.status==="error"){setRefineError(job.error||"The agent reported an error.");setRefinePhase("error");return;}
@@ -4873,14 +4921,20 @@
         return()=>{live=false;if(to)clearTimeout(to);};
       },[refineJobId,refinePhase]);
       const applySuggestion=useCallback((s)=>{
+        // Resolve which transition this suggestion targets. In "All transitions"
+        // scope every suggestion carries its own `transitionId`; otherwise it
+        // applies to the currently-active transition. Everything below writes to
+        // `tgt` (and its sibling phases), so multi-transition Apply just works.
+        const tgt=(s&&s.transitionId?entries.find(e=>e.id===s.transitionId):null)||active;
+        if(!tgt)return;
         // A replace suggestion may carry `patches` (one per related phase, e.g.
         // open + close) — a recipe swap is one motion, so applying it writes BOTH.
-        // Otherwise fall back to the single `patch` on the active phase.
+        // Otherwise fall back to the single `patch` on the target phase.
         let patches=Array.isArray(s.patches)&&s.patches.length
           ? s.patches
-          : (s.patch&&s.patch.property?[{...s.patch,phase:(active&&active.phase)||null}]:[]);
+          : (s.patch&&s.patch.property?[{...s.patch,phase:(tgt&&tgt.phase)||null}]:[]);
         if(!patches.length)return;
-        const groupId=active&&active.groupId;
+        const groupId=tgt&&tgt.groupId;
         // Same-slot swap recipes (icon/text swaps) use two stacked members in one
         // group. The agent can sometimes return the recipe's blur/scale value for
         // only the currently selected member; expand those value patches to every
@@ -4891,7 +4945,7 @@
           const extra=[]; const has=new Set(patches.map(p=>[p.phase||"",p.property||"",p.member||"",p.blur!=null?"blur":"",p.scale!=null?"scale":"",p.translate!=null?"translate":""].join("|")));
           const valuePatches=patches.filter(p=>p.member&&(p.blur!=null||p.scale!=null)&&(p.property==="filter"||p.property==="transform"));
           for(const p of valuePatches){
-            const target=entries.find(e=>e.kind==="phase"&&e.groupId===groupId&&(!p.phase||e.phase===p.phase))||active;
+            const target=entries.find(e=>e.kind==="phase"&&e.groupId===groupId&&(!p.phase||e.phase===p.phase))||tgt;
             const members=new Map();
             for(const t of (target&&target.effectiveTimings)||[]){
               const m=t.member||t.memberId;if(m&&!members.has(m))members.set(m,m);
@@ -4933,7 +4987,7 @@
           if(p.easing!=null)timingOverride.easing=p.easing;
           // resolve the phase entry this patch targets (its sibling open/close
           // lives in the same group); default to the active entry.
-          let target=active;
+          let target=tgt;
           if(p.phase&&groupId){
             const found=entries.find(e=>e.kind==="phase"&&e.groupId===groupId&&e.phase===p.phase);
             if(found)target=found;
@@ -5619,7 +5673,7 @@
             h(RefinePanel,{open:refineOpen,onClose:()=>setRefineOpen(false),phase:refinePhase,label:refineLabel,
               refineType,onType:changeRefineType,suggestions:refineSuggestions,summary:refineSummary,error:refineError,
               appliedIds,onApply:applySuggestion,onApplyAll:applyAllSuggestions,
-                    mode:refineMode,onMode:changeRefineMode,llmAvailable,cliInstalled,relayDown,agentReason,onReconnect:reconnectAgent,onStart:startScan,
+                    scope:refineScope,onScope:changeRefineScope,llmAvailable,cliInstalled,relayDown,agentReason,onReconnect:reconnectAgent,onStart:startScan,
                     lanes:active?.effectiveTimings||[],resolvedTheme}))
               : h("div",{className:"tl-panel-main"},
                   gate==="blocked" && h("div",{className:"tl-gate"},

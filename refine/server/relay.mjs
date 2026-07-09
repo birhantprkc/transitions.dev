@@ -293,6 +293,47 @@ const MISSING_BLUR_NOTE =
 
 function buildPrompt(job) {
   const r = job.request || {};
+  // "All transitions" replace scope: the panel sends EVERY detected transition
+  // and wants a LIST of whole-transition replacements — one per transition the
+  // agent finds a good transitions.dev recipe for. Each suggestion echoes its
+  // `transitionId` so the panel applies it to the right transition, and carries
+  // the SAME patch/patches contract as a single replace so Apply is unchanged.
+  const transitions = Array.isArray(r.transitions) ? r.transitions.filter((t) => t && t.transitionId) : [];
+  if (r.scope === "all" && transitions.length) {
+    return [
+      "You are refining MULTIPLE CSS transitions against the transitions.dev library and motion tokens. Evaluate EVERY transition below; for each one where a transitions.dev recipe is a genuinely good fit, emit ONE whole-transition replacement. Transitions with no good recipe match are simply OMITTED — never force a swap.",
+      MOTION_TOKENS_BLOCK,
+      "",
+      "Transitions (JSON array). Each has a stable `transitionId` you MUST echo VERBATIM in that transition's suggestion, its current `timings`, and — when it has related states — a `phases` array (e.g. open + close) that is ONE motion.",
+      JSON.stringify(
+        transitions.map((t) => ({
+          transitionId: t.transitionId,
+          label: t.label,
+          selector: t.selector,
+          timings: t.timings,
+          phases: Array.isArray(t.phases) && t.phases.length ? t.phases : undefined,
+        })),
+        null,
+        2
+      ),
+      "",
+      "For EACH transition infer its USAGE (modal close, dropdown open, tooltip, badge, resize, page slide, icon/text swap…) from its label/selector. Match on usage intent, not the nearest number. A lane may carry `scale`/`translate` (transform) or `blur` (filter) plus a `varName`/`translateVarName` — check those against the Scales/Blur/recipe values too and pass any var names straight through in the patch.",
+      "",
+      "To pick a whole-transition replacement, match the inferred USAGE against the recipe list below (the skill's decision rules are summarised here — do NOT read SKILL.md or any reference file). Put the recipe's reference filename in `reference`.",
+      "",
+      RECIPES_BLOCK,
+      "",
+      "PER-TRANSITION OUTPUT — for each transition you replace, emit ONE suggestion with kind \"replace\" and `transitionId` set to that transition's id:",
+      "  - If the transition has a `phases` array, emit a `patches` array with ONE phase-level timing entry per phase (`{\"phase\":<phase>,\"property\":\"all\",\"durationMs\":...,\"easing\":...}`) PLUS extra per-lane value patches for any recipe non-resting scale/blur/translate (`property:\"transform\"`/`\"filter\"` with the lane `member` and `varName`/`translateVarName` copied from that phase's input timings; when the recipe adds a lane the input lacks, still emit it and reuse a sibling lane's `member`, omitting the var name). Also include a single `patch` (the first phase) for the live preview. Set each phase's durationMs AND easing from \"Recipe timing & easing\" (SYMMETRIC recipes use the SAME duration+easing for every phase; ASYMMETRIC use open 250ms / close 150ms).",
+      "  - Otherwise (single phase): set its `patch` to the recipe's documented duration AND easing on the property that already transitions (or \"all\"); if the recipe prescribes a non-resting pre-blur/pre-scale/slide-distance, put those `blur`/`scale`/`translate` values on the `patch` too so the element gains them even when the captured transition had no such lane.",
+      "Copy each suggestion's and patch's `member` VERBATIM from the input lane it came from — REQUIRED whenever an input lane carries a member (it is the only way to tell which lane a transform/filter tweak targets).",
+      "Return ALL such suggestions in ONE array (order doesn't matter). If NO transition has a good recipe match, return an empty suggestions array.",
+      "Answer in ONE response — do NOT read or search files.",
+      "",
+      "Output ONLY a JSON object — no prose, no markdown fences — shaped exactly like:",
+      '{"summary":"…","suggestions":[{"id":"dropdown-replace","transitionId":"<echo an id from the input>","kind":"replace","title":"Menu dropdown","reference":"05-menu-dropdown.md","patch":{"property":"all","member":"Panel","durationMs":250,"easing":"cubic-bezier(0.22, 1, 0.36, 1)","scale":0.97},"patches":[{"phase":"open","property":"all","durationMs":250,"easing":"cubic-bezier(0.22, 1, 0.36, 1)"},{"phase":"open","property":"transform","member":"Panel","scale":0.97},{"phase":"close","property":"all","durationMs":150,"easing":"cubic-bezier(0.22, 1, 0.36, 1)"}],"reason":"…"}]}',
+    ].join("\n");
+  }
   const rawType = r.refineType || "small";
   const refineType = rawType === "replace" ? "replace" : rawType === "both" ? "both" : "small";
   const needsRecipe = refineType === "replace" || refineType === "both";
