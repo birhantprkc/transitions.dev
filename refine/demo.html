@@ -2383,6 +2383,7 @@
         for(const n of Object.keys(rec.prevVars||{})){try{const pv=rec.prevVars[n];if(pv)el.style.setProperty(n,pv);else el.style.removeProperty(n);}catch{}}
       }
       store.applied&&store.applied.clear();
+      try{tlSyncNoneGuard(TL_LP_GUARD_PHASE_ID,null);}catch{}
     }
 
     // ── registry (per-lane overrides) ──
@@ -2666,6 +2667,66 @@
       }catch{}
       return out;
     }
+    // ── FLIP "jump-to-start" guard ──────────────────────────────────────────
+    // Many transitions teleport to a start offset before animating, using a
+    // state class that sets `transition: none` (the FLIP pattern), e.g.
+    // `.t-text-swap.is-enter-start { transform: translateY(...); transition: none }`.
+    // Our live-preview mirrors edited timings as an INLINE `transition` on the
+    // element; inline wins (specificity 1,0,0,0) over that class rule, so the
+    // instant teleport becomes an animation — the entering content then eases
+    // in from the EXIT position instead of its start offset, flipping the
+    // direction. Fix generally: find those page-authored `transition: none`
+    // start-states and re-assert them with `!important` so the teleport stays
+    // instant regardless of our inline transition. We only match STATE variants
+    // (a selector whose subject compound carries a class the element is NOT
+    // currently wearing) so we never freeze an element's BASE transition — the
+    // base is what carries the lanes we add. @media blocks (e.g. reduced-motion)
+    // are skipped so we don't promote their `transition: none` to always-on.
+    const _TL_NONE_CACHE=new WeakMap();
+    function tlCollectNoneSelectors(el){
+      let cached=_TL_NONE_CACHE.get(el); if(cached)return cached;
+      const out=new Set();
+      try{
+        const own=(typeof el.className==="string"?el.className.trim().split(/\s+/):Array.from(el.classList||[])).filter(Boolean);
+        if(own.length){
+          const ownSet=new Set(own);
+          const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+          const tokRes=own.map(c=>new RegExp("\\."+esc(c)+"(?![\\w-])"));
+          for(const sheet of Array.from(document.styleSheets||[])){
+            let rules;try{rules=sheet.cssRules;}catch{continue;}
+            for(const rule of Array.from(rules||[])){
+              if(rule.selectorText===undefined)continue; // skip @media / @supports etc.
+              const tv=rule.style&&rule.style.getPropertyValue("transition");
+              if(!tv||!/^\s*none\s*$/i.test(tv))continue;
+              for(const part of rule.selectorText.split(",")){
+                const s=part.trim(); if(!s)continue;
+                // subject = rightmost compound that carries one of the element's tokens.
+                const compounds=s.split(/\s*[>+~]\s*|\s+/).filter(Boolean);
+                let subject=null;
+                for(let i=compounds.length-1;i>=0;i--){ if(tokRes.some(re=>re.test(compounds[i]))){subject=compounds[i];break;} }
+                if(!subject)continue;
+                const subjClasses=(subject.match(/\.[-\w]+/g)||[]).map(c=>c.slice(1));
+                // require a state class the element isn't currently wearing.
+                if(subjClasses.some(c=>!ownSet.has(c)))out.add(s);
+              }
+            }
+          }
+        }
+      }catch{}
+      _TL_NONE_CACHE.set(el,out);
+      return out;
+    }
+    function tlSyncNoneGuard(id,selectors){
+      try{
+        let st=document.getElementById(id);
+        if(!selectors||!selectors.size){ if(st)st.remove(); return; }
+        if(!st){ st=document.createElement("style"); st.id=id; (document.head||document.documentElement).appendChild(st); }
+        const css=Array.from(selectors).map(s=>s+"{transition:none !important;}").join("\n");
+        if(st.textContent!==css)st.textContent=css;
+      }catch{}
+    }
+    const TL_LP_GUARD_FLAT_ID="tl-live-none-guard-flat";
+    const TL_LP_GUARD_PHASE_ID="tl-live-none-guard-phase";
     // Same, resolving the element from a CSS selector (used when only a lane's
     // selector is known, e.g. a grouped phase member).
     function laneValueHint(selector, property){
@@ -5147,12 +5208,17 @@
           _TX_LIVE_BASE.delete(el);
           applied.delete(el);
         }
+        // keep FLIP jump-to-start states instant under our inline transition
+        const guard=new Set();
+        for(const el of desired.keys()){ for(const s of tlCollectNoneSelectors(el)) guard.add(s); }
+        tlSyncNoneGuard(TL_LP_GUARD_FLAT_ID,guard);
       },[entries,registry]);
       // restore everything on unmount
       useEffect(()=>()=>{
         const applied=liveAppliedRef.current;
         for(const [el,rec] of applied){ try{el.style.transition=rec.prevInline;}catch{} for(const n of Object.keys(rec.vars||{})){try{const pv=(rec.prevVars||{})[n];if(pv)el.style.setProperty(n,pv);else el.style.removeProperty(n);}catch{}} _TX_LIVE_BASE.delete(el); }
         applied.clear();
+        tlSyncNoneGuard(TL_LP_GUARD_FLAT_ID,null);
       },[]);
       // ── live styling: grouped phases (state-gated) ──────────────────────────
       // Open and close of one component share the SAME element(s), so a single
@@ -5277,6 +5343,10 @@
             for(const n of Object.keys(rec.prevVars||{})){try{const pv=rec.prevVars[n];if(pv)el.style.setProperty(n,pv);else el.style.removeProperty(n);}catch{}}
             store.applied.delete(el);
           }
+          // keep FLIP jump-to-start states instant under our inline transition
+          const guard=new Set();
+          for(const el of desiredCss.keys()){ for(const s of tlCollectNoneSelectors(el)) guard.add(s); }
+          tlSyncNoneGuard(TL_LP_GUARD_PHASE_ID,guard);
         };
         // Coalesce via microtask (NOT rAF): the gate must update the moment the
         // state class/attr flips — before the browser styles the next frame — so
