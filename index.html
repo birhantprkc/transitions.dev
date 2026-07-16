@@ -5543,7 +5543,12 @@
       width: var(--pro4-open-w);
       height: var(--pro4-open-h);
       border-radius: 32px;
-      overflow: hidden;
+      /* overflow stays VISIBLE (the rounded clip lives on the img via
+         border-radius: inherit) so the bend canvas can bow past the
+         box — and, critically, so overflow never toggles mid-flight:
+         in Safari that would kick the card off its compositor layer
+         and jank the scale/tilt spring. */
+      overflow: visible;
       cursor: pointer;
       background: var(--stage-bg, #eeeeef);
       box-shadow: var(--pro-surface-shadow);
@@ -5566,14 +5571,12 @@
       display: none;
       pointer-events: none;
     }
-    /* While bending, the canvas IS the card's visual: unclip the
-       card (the rounded clip is baked into the warp itself and the
-       bow must escape the box) and hide the flat photo + background
-       so no straight-edged fill peeks out behind the bowed edges.
+    /* While bending, the canvas IS the card's visual: hide the flat
+       photo + background so no straight-edged fill peeks out behind
+       the bowed edges (the rounded clip is baked into the warp).
        The box-shadow stays — soft enough that not bending it is
        imperceptible, and it never flickers on/off this way. */
     .pro4-card.is-bending {
-      overflow: visible;
       background: transparent;
     }
     .pro4-card.is-bending .pro4-img { visibility: hidden; }
@@ -5629,6 +5632,8 @@
       object-fit: cover;
       display: block;
       pointer-events: none;
+      /* The rounded clip (tracks the card's animating radius). */
+      border-radius: inherit;
     }
 
     /* ── PRO5 "Pro" gradient text ──────────────────────────────── */
@@ -12603,10 +12608,12 @@ export function Surface({ open, children }) {
           }
         }
 
-        function renderBend(s) {
-          // Radius LIVE from the animating style so the 32↔16px
-          // flight transition keeps rendering during the bend.
-          var rr = (parseFloat(getComputedStyle(card).borderTopLeftRadius) || 0) * dprB;
+        function renderBend(s, rCss) {
+          // Radius passed in analytically (see runBend) — reading
+          // getComputedStyle here every frame forces a style recalc
+          // mid-animation, which is cheap in Blink but expensive
+          // enough in Safari to drop the bend to ~30fps.
+          var rr = rCss * dprB;
           var W = canvas.width, H = canvas.height;
           var src = snapData, dst = outData.data;
           var sDev = s * dprB;
@@ -12706,6 +12713,16 @@ export function Surface({ open, children }) {
           var durMs = explicit > 0 ? explicit : flightMs;
           if (durMs <= 0) return;
           var ease = makeBendEase(readStr("--pro4-bend-ease"));
+          // Radius over the flight, computed analytically with the
+          // same duration + curve as the CSS border-radius transition
+          // (read once here; per-frame getComputedStyle would force a
+          // Safari style recalc every frame). 32px rest ↔ 16px open —
+          // must match the .pro4-card / .is-open CSS.
+          var rFrom = parseFloat(getComputedStyle(card).borderTopLeftRadius) || 0;
+          var rTo = sign > 0 ? 16 : 32;
+          var flightEase = makeBendEase(
+            readStr(sign > 0 ? "--pro4-open-ease" : "--pro4-close-ease")
+          );
           if (bendRaf) cancelAnimationFrame(bendRaf);
           prepareBend(strength);
           card.classList.add("is-bending");
@@ -12714,7 +12731,8 @@ export function Surface({ open, children }) {
             var p = Math.min((now - t0) / durMs, 1);
             var e = Math.min(Math.max(ease(p), 0), 1);
             var env = Math.sin(Math.PI * e);
-            renderBend(strength * sign * env);
+            var p2 = Math.min((now - t0) / Math.max(flightMs, 1), 1);
+            renderBend(strength * sign * env, rFrom + (rTo - rFrom) * flightEase(p2));
             if (p < 1) {
               bendRaf = requestAnimationFrame(tick);
             } else {
