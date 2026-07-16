@@ -12565,7 +12565,13 @@ export function Surface({ open, children }) {
           // Max |displacement| ≈ 0.30 · strength (parabola + noise).
           padB = Math.ceil(Math.abs(strength) * 0.32) + 4;
           padDevB = Math.round(padB * dprB);
-          canvas.style.inset = -padB + "px";
+          // Canvas is a REPLACED element: absolute + inset does NOT
+          // stretch it (it keeps its intrinsic attribute size), so
+          // the CSS box must be sized explicitly.
+          canvas.style.left = -padB + "px";
+          canvas.style.top = -padB + "px";
+          canvas.style.width = (cw + padB * 2) + "px";
+          canvas.style.height = (chh + padB * 2) + "px";
           canvas.width = sw + padDevB * 2;
           canvas.height = sh + padDevB * 2;
           outData = cctx.createImageData(canvas.width, canvas.height);
