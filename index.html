@@ -5094,10 +5094,20 @@
     .cmdk-panel {
       width: 100%; max-width: 560px; background: #fff; border-radius: 14px;
       box-shadow: var(--menu-shadow); overflow: hidden;
-      transform: scale(0.98) translateY(-6px); transition: transform 200ms var(--nav-ease);
+      transform-origin: center;
+      transform: scale(var(--p7-scale)); opacity: 0;
+      transition:
+        transform var(--p7-close-dur) var(--p7-ease),
+        opacity   var(--p7-close-dur) var(--p7-ease);
+      will-change: transform, opacity;
     }
     html[data-theme="dark"] .cmdk-panel { background: #202020; }
-    .cmdk-overlay[data-open="true"] .cmdk-panel { transform: scale(1) translateY(0); }
+    .cmdk-overlay[data-open="true"] .cmdk-panel {
+      transform: scale(1); opacity: 1;
+      transition:
+        transform var(--p7-open-dur) var(--p7-ease),
+        opacity   var(--p7-open-dur) var(--p7-ease);
+    }
     .cmdk-search { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--nav-line); }
     .cmdk-search svg { width: 18px; height: 18px; flex: none; color: #8b8b8b; }
     .cmdk-input { flex: 1; min-width: 0; border: 0; outline: none; background: none; color: var(--text); font-family: var(--font-sans); font-size: 15px; line-height: 22px; }

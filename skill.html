@@ -40,8 +40,8 @@
   <meta property="og:locale" content="en_US" />
   <meta property="og:title" content="Transitions.dev Skill — Teach your AI about product motion" />
   <meta property="og:description" content="Transitions.dev Skill teaches your AI about product motion. Works with Claude Code, Cursor, GitHub Copilot, Codex, and Gemini CLI." />
-  <meta property="og:image" content="https://transitions.dev/assets/og-image-skill.jpg" />
-  <meta property="og:image:secure_url" content="https://transitions.dev/assets/og-image-skill.jpg" />
+  <meta property="og:image" content="https://transitions.dev/assets/og-main.jpg" />
+  <meta property="og:image:secure_url" content="https://transitions.dev/assets/og-main.jpg" />
   <meta property="og:image:type" content="image/jpeg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
@@ -50,7 +50,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Transitions.dev Skill — Teach your AI about product motion" />
   <meta name="twitter:description" content="Transitions.dev Skill teaches your AI about product motion. Works with Claude Code, Cursor, GitHub Copilot, Codex, and Gemini CLI." />
-  <meta name="twitter:image" content="https://transitions.dev/assets/og-image-skill.jpg" />
+  <meta name="twitter:image" content="https://transitions.dev/assets/og-main.jpg" />
   <meta name="twitter:image:alt" content="Transitions.dev Skill — Teach your AI about product motion" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -96,7 +96,7 @@
           "inLanguage": "en",
           "primaryImageOfPage": {
             "@type": "ImageObject",
-            "url": "https://transitions.dev/assets/og-image-skill.jpg",
+            "url": "https://transitions.dev/assets/og-main.jpg",
             "width": 1200,
             "height": 630
           }
@@ -3740,10 +3740,20 @@
     .cmdk-panel {
       width: 100%; max-width: 560px; background: #fff; border-radius: 14px;
       box-shadow: var(--menu-shadow); overflow: hidden;
-      transform: scale(0.98) translateY(-6px); transition: transform 200ms var(--nav-ease);
+      transform-origin: center;
+      transform: scale(var(--p7-scale)); opacity: 0;
+      transition:
+        transform var(--p7-close-dur) var(--p7-ease),
+        opacity   var(--p7-close-dur) var(--p7-ease);
+      will-change: transform, opacity;
     }
     html[data-theme="dark"] .cmdk-panel { background: #202020; }
-    .cmdk-overlay[data-open="true"] .cmdk-panel { transform: scale(1) translateY(0); }
+    .cmdk-overlay[data-open="true"] .cmdk-panel {
+      transform: scale(1); opacity: 1;
+      transition:
+        transform var(--p7-open-dur) var(--p7-ease),
+        opacity   var(--p7-open-dur) var(--p7-ease);
+    }
     .cmdk-search { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--nav-line); }
     .cmdk-search svg { width: 18px; height: 18px; flex: none; color: #8b8b8b; }
     .cmdk-input { flex: 1; min-width: 0; border: 0; outline: none; background: none; color: var(--text); font-family: var(--font-sans); font-size: 15px; line-height: 22px; }

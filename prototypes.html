@@ -3166,6 +3166,21 @@
     }
 
     /* ============================================================ */
+    /* Touch targets — invisible ≥16px hit-area expander so the small
+       controls (like button, checkbox, toggle) are comfortable to tap
+       on mobile without changing their visual size. The pseudo is a
+       child of each button, so tapping the padded area still triggers
+       the button. */
+    /* ============================================================ */
+    .p23-like::before,
+    .p25-box::before,
+    .p27-switch::before {
+      content: "";
+      position: absolute;
+      inset: -16px;
+    }
+
+    /* ============================================================ */
     /* Reduced motion                                                */
     /* ============================================================ */
     @media (prefers-reduced-motion: reduce) {

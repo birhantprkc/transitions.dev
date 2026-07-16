@@ -5080,13 +5080,27 @@
     }
     html[data-theme="dark"] .cmdk-overlay { background: rgba(0, 0, 0, 0.5); }
     .cmdk-overlay[data-open="true"] { opacity: 1; pointer-events: auto; }
+    /* Search panel uses the transitions.dev skill's Modal open/close (P7):
+       scale up from --p7-scale with an opacity fade, 250ms open / 150ms
+       close (the closed base rule carries the close duration, so reverting
+       data-open animates out on its own), smooth-out ease. */
     .cmdk-panel {
       width: 100%; max-width: 560px; background: #fff; border-radius: 14px;
       box-shadow: var(--menu-shadow); overflow: hidden;
-      transform: scale(0.98) translateY(-6px); transition: transform 200ms var(--nav-ease);
+      transform-origin: center;
+      transform: scale(var(--p7-scale)); opacity: 0;
+      transition:
+        transform var(--p7-close-dur) var(--p7-ease),
+        opacity   var(--p7-close-dur) var(--p7-ease);
+      will-change: transform, opacity;
     }
     html[data-theme="dark"] .cmdk-panel { background: #202020; }
-    .cmdk-overlay[data-open="true"] .cmdk-panel { transform: scale(1) translateY(0); }
+    .cmdk-overlay[data-open="true"] .cmdk-panel {
+      transform: scale(1); opacity: 1;
+      transition:
+        transform var(--p7-open-dur) var(--p7-ease),
+        opacity   var(--p7-open-dur) var(--p7-ease);
+    }
     .cmdk-search { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--nav-line); }
     .cmdk-search svg { width: 18px; height: 18px; flex: none; color: #8b8b8b; }
     .cmdk-input { flex: 1; min-width: 0; border: 0; outline: none; background: none; color: var(--text); font-family: var(--font-sans); font-size: 15px; line-height: 22px; }
@@ -5648,12 +5662,6 @@
     }
     html[data-theme="dark"] .detail-paywall-sub { color: #9a9a9a; }
     /* Staggered blurred rise on reveal (transitions-dev texts-reveal). */
-    .detail-paywall > div { animation: detail-paywall-rise 500ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-    .detail-paywall > .detail-paywall-actions { animation-delay: 100ms; }
-    @keyframes detail-paywall-rise {
-      from { opacity: 0; transform: translateY(12px); filter: blur(3px); }
-      to   { opacity: 1; transform: none; filter: none; }
-    }
     .detail-paywall-actions {
       display: flex;
       align-items: center;
@@ -5687,8 +5695,6 @@
     .detail-paywall-btn { transition: scale 120ms cubic-bezier(0.22, 1, 0.36, 1), background 120ms ease; }
     .detail-paywall-btn:active { scale: 0.96; }
     @media (prefers-reduced-motion: reduce) {
-      .detail-paywall > div,
-      .detail-paywall > .detail-paywall-actions { animation: none; }
       .detail-paywall-btn { transition: none; }
     }
     html[data-theme="dark"] .detail-paywall-btn--primary { background: #f2f2f2; color: #111; }
@@ -6708,6 +6714,7 @@
                 <p class="skill-section-note"><a href="pro.html">Pro Skill</a>: installs the premium transitions as an agent skill (CSS, React, TypeScript). Opens your browser once to confirm your Pro account, then drops it into your skills directory. See <a href="pro.html">Transitions Pro</a>.</p>
               </div>
               <div class="skill-command">
+                <span class="skill-command-label">Free &amp; Pro version</span>
                 <div class="skill-code-row">
                   <code id="refine-cmd">npx transitions-refine live</code>
                   <button type="button" class="skill-code-copy" aria-label="Copy Refine tool command" data-copy-target="#refine-cmd">

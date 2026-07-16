@@ -40,8 +40,8 @@
   <meta property="og:locale" content="en_US" />
   <meta property="og:title" content="Transitions Pro: The essential UI transitions for web apps" />
   <meta property="og:description" content="A collection of the most essential UI transitions for web apps. Copy and paste them, or use them with the skill directly in your project." />
-  <meta property="og:image" content="https://transitions.dev/assets/og-image.jpg" />
-  <meta property="og:image:secure_url" content="https://transitions.dev/assets/og-image.jpg" />
+  <meta property="og:image" content="https://transitions.dev/assets/og-pro.jpg" />
+  <meta property="og:image:secure_url" content="https://transitions.dev/assets/og-pro.jpg" />
   <meta property="og:image:type" content="image/jpeg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
@@ -50,7 +50,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Transitions Pro: The essential UI transitions for web apps" />
   <meta name="twitter:description" content="A collection of the most essential UI transitions for web apps. Copy and paste them, or use them with the skill directly in your project." />
-  <meta name="twitter:image" content="https://transitions.dev/assets/og-image.jpg" />
+  <meta name="twitter:image" content="https://transitions.dev/assets/og-pro.jpg" />
   <meta name="twitter:image:alt" content="Transitions Pro: The essential UI transitions for web apps" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -96,7 +96,7 @@
           "inLanguage": "en",
           "primaryImageOfPage": {
             "@type": "ImageObject",
-            "url": "https://transitions.dev/assets/og-image.jpg",
+            "url": "https://transitions.dev/assets/og-pro.jpg",
             "width": 1200,
             "height": 630
           }
@@ -3819,10 +3819,21 @@
       border-radius: 14px;
       box-shadow: var(--menu-shadow);
       overflow: hidden;
-      transform: scale(0.98) translateY(-6px);
-      transition: transform 200ms var(--ease-smooth-out);
+      /* transitions.dev skill Modal open/close (P7): scale + fade,
+         250ms open / 150ms close, smooth-out ease. */
+      transform-origin: center;
+      transform: scale(var(--p7-scale)); opacity: 0;
+      transition:
+        transform var(--p7-close-dur) var(--p7-ease),
+        opacity   var(--p7-close-dur) var(--p7-ease);
+      will-change: transform, opacity;
     }
-    .cmdk-overlay[data-open="true"] .cmdk-panel { transform: scale(1) translateY(0); }
+    .cmdk-overlay[data-open="true"] .cmdk-panel {
+      transform: scale(1); opacity: 1;
+      transition:
+        transform var(--p7-open-dur) var(--p7-ease),
+        opacity   var(--p7-open-dur) var(--p7-ease);
+    }
     .cmdk-search {
       display: flex;
       align-items: center;
@@ -5170,7 +5181,7 @@ description: Production-ready CSS
             <span class="t-acc-chevron" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M4 6.5L8 10.5L12 6.5" /></svg></span>
           </button>
           <div class="t-acc-panel"><div class="t-acc-panel-inner">
-            <p>The free site showcases the core transitions with copy-ready snippets. Pro unlocks the full 30-transition library, the extended Pro skill, the Refine tool with the Pro recipes, advanced annotation, and all future updates for the life of your plan.</p>
+            <p>The free site showcases the core transitions with copy-ready snippets. Pro unlocks the full 30-transition library with React and TypeScript variants of every transition, delivered both inside the Pro skill and through the install package (<code>npx transitions-pro add --pro</code>). You also get the extended Pro skill, the Refine tool with the Pro recipes, advanced annotation, and all future updates for the life of your plan.</p>
           </div></div>
         </div>
 
