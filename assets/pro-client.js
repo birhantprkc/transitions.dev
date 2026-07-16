@@ -136,10 +136,12 @@
     }
   }
 
-  function selectedPlan() {
+  function selectedBilling() {
     var billing = document.getElementById("pro-billing");
-    var annual = billing && billing.getAttribute("data-billing") === "annual";
-    return annual ? "yearly" : "monthly";
+    return (billing && billing.getAttribute("data-billing")) || "monthly";
+  }
+  function selectedPlan() {
+    return selectedBilling() === "annual" ? "yearly" : "monthly";
   }
   function teamSelected() {
     return !!document.querySelector('.pro-price-tab[data-plan="team"][data-active="true"]');
@@ -153,11 +155,17 @@
 
   function startCheckout() {
     // Team → per-seat subscription (buyer adjusts seat count on Stripe Checkout).
-    // Both Solo and Team honour the monthly/annual billing toggle.
-    var annual = selectedPlan() === "yearly";
-    var payload = teamSelected()
-      ? { plan: "team", interval: annual ? "year" : "month" }
-      : { plan: selectedPlan() };
+    // The billing toggle carries monthly / annual / lifetime; lifetime is a
+    // one-time payment plan on both Solo and Team.
+    var billingKind = selectedBilling();
+    var payload;
+    if (billingKind === "lifetime") {
+      payload = { plan: teamSelected() ? "team-lifetime" : "lifetime" };
+    } else if (teamSelected()) {
+      payload = { plan: "team", interval: billingKind === "annual" ? "year" : "month" };
+    } else {
+      payload = { plan: selectedPlan() };
+    }
     var cta = document.getElementById("pro-price-cta");
     setBusy(cta, true);
     apiJSON("/checkout", "POST", payload)

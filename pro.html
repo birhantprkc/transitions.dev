@@ -4034,7 +4034,10 @@
       opacity: 0;
       transition: opacity 200ms var(--ease-smooth-out);
     }
-    .pro-billing[data-billing="annual"] .pro-annual-note { opacity: 1; }
+    /* Each note lights up only for its own billing period (both share the
+       positioning class, so scope by id). */
+    .pro-billing[data-billing="annual"] #pro-annual-note { opacity: 1; }
+    .pro-billing[data-billing="lifetime"] #pro-lifetime-note { opacity: 1; }
 
     /* ── Framework badges (React / TypeScript / Next.js) ────────── */
     /* Figma node 2332:3489 — three 24×24 monochrome chips, 7px gap. */
@@ -4988,7 +4991,9 @@
       <span class="pro-billing-indicator" id="pro-billing-indicator" aria-hidden="true"></span>
       <button type="button" class="pro-billing-opt" data-billing-opt="monthly" data-active="true" role="tab" aria-selected="true">Monthly</button>
       <button type="button" class="pro-billing-opt" data-billing-opt="annual" data-active="false" role="tab" aria-selected="false">Annual</button>
+      <button type="button" class="pro-billing-opt" data-billing-opt="lifetime" data-active="false" role="tab" aria-selected="false">Lifetime</button>
       <span class="pro-annual-note" id="pro-annual-note">2 months free</span>
+      <span class="pro-annual-note pro-lifetime-note" id="pro-lifetime-note">pay once</span>
     </div>
 
     <!-- ─── Pricing card (Solo / Team) ─────────────────────────── -->
@@ -5185,7 +5190,7 @@ description: Production-ready CSS
             <span class="t-acc-chevron" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M4 6.5L8 10.5L12 6.5" /></svg></span>
           </button>
           <div class="t-acc-panel"><div class="t-acc-panel-inner">
-            <p><strong>Solo</strong> is a single seat for one person across all of their projects. <strong>Team</strong> is $39/mo and includes 5 seats for people in the same organization; each seat beyond 5 is an extra $9/mo. Switch the plan tab above to see team pricing.</p>
+            <p><strong>Solo</strong> is a single seat for one person across all of their projects. <strong>Team</strong> is $39/mo and includes 5 seats for people in the same organization; each seat beyond 5 is an extra $9/mo. Prefer to pay once? <strong>Lifetime</strong> is a one-time purchase — $149 for Solo, $499 for a 5-seat Team — with every future transition included, forever. Switch the plan tab above to see team pricing.</p>
           </div></div>
         </div>
 
@@ -5787,11 +5792,13 @@ description: Production-ready CSS
       var PRICES = {
         solo: {
           monthly: { v: "$9", per: "/mo", seat: "Single seat" },
-          annual:  { v: "$90", per: "/yr", seat: "Single seat · billed yearly" }
+          annual:  { v: "$90", per: "/yr", seat: "Single seat · billed yearly" },
+          lifetime: { v: "$149", per: "once", seat: "Single seat · pay once, yours forever" }
         },
         team: {
           monthly: { v: "$39", per: "/mo", seat: "5 seats · +$9/seat after" },
-          annual:  { v: "$390", per: "/yr", seat: "5 seats · +$90/seat after · billed yearly" }
+          annual:  { v: "$390", per: "/yr", seat: "5 seats · +$90/seat after · billed yearly" },
+          lifetime: { v: "$499", per: "once", seat: "5 seats · pay once, yours forever" }
         }
       };
       var billing = document.getElementById("pro-billing");
@@ -6077,6 +6084,6 @@ description: Production-ready CSS
     })();
   </script>
   <!-- Pro platform client: wires Get access / Sign in / account state to the API. -->
-  <script src="assets/pro-client.js?v=11" defer></script>
+  <script src="assets/pro-client.js?v=12" defer></script>
 </body>
 </html>

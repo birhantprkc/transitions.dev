@@ -4463,8 +4463,10 @@
       color: var(--text); text-align: left;
     }
     /* The base `display: flex` outranks the [hidden] UA rule, so hide explicitly
-       (e.g. Members is hidden for solo plans). */
-    .account-nav-item[hidden] { display: none; }
+       (e.g. Members is hidden for solo plans; Cancel/Adjust for lifetime). */
+    .account-nav-item[hidden],
+    .settings-row[hidden],
+    .row-btn[hidden] { display: none; }
     .account-nav-item:hover { background: rgba(0, 0, 0, 0.03); }
     .account-nav-item.is-active { background: rgba(0, 0, 0, 0.03); }
     html[data-theme="dark"] .account-nav-item:hover,
@@ -4922,7 +4924,7 @@
           </div>
 
           <div class="settings-list">
-            <div class="settings-row">
+            <div class="settings-row" id="acc-cancel-row">
               <span class="settings-label">Cancel plan</span>
               <button type="button" class="row-btn" id="acc-cancel">Cancel</button>
             </div>
@@ -5834,7 +5836,7 @@
     })();
   </script>
   <!-- Pro platform client: wires Get access / Sign in / account state to the API. -->
-  <script src="assets/pro-client.js?v=11" defer></script>
+  <script src="assets/pro-client.js?v=12" defer></script>
   <script>
     document.addEventListener("DOMContentLoaded", function () {
       var TP = window.TransitionsPro;
@@ -5895,16 +5897,28 @@
         el("acc-email").textContent = s.email || "—";
         var sub = s.subscription || null;
         var yearly = sub && sub.interval === "year";
-        el("acc-plan-name").textContent = s.pro ? "Pro plan" : "No active plan";
-        el("acc-plan-price").textContent = yearly ? "$90" : "$9";
-        el("acc-plan-per").textContent = yearly ? "/yr" : "/mo";
-        var renew = "";
-        if (sub && sub.current_period_end) {
-          renew = (sub.cancel_at_period_end
-            ? "Your subscription ends on "
-            : "Your subscription will auto renew on ") + fmtDate(sub.current_period_end) + ".";
+        if (s.lifetime) {
+          // One-time purchase: no renewal, nothing to cancel or adjust.
+          el("acc-plan-name").textContent = "Pro plan · Lifetime";
+          el("acc-plan-price").textContent = "$149";
+          el("acc-plan-per").textContent = "once";
+          el("acc-plan-renew").textContent = "Pay once, yours forever — includes every future transition.";
+        } else {
+          el("acc-plan-name").textContent = s.pro ? "Pro plan" : "No active plan";
+          el("acc-plan-price").textContent = yearly ? "$90" : "$9";
+          el("acc-plan-per").textContent = yearly ? "/yr" : "/mo";
+          var renew = "";
+          if (sub && sub.current_period_end) {
+            renew = (sub.cancel_at_period_end
+              ? "Your subscription ends on "
+              : "Your subscription will auto renew on ") + fmtDate(sub.current_period_end) + ".";
+          }
+          el("acc-plan-renew").textContent = renew;
         }
-        el("acc-plan-renew").textContent = renew;
+        var cancelRow = el("acc-cancel-row");
+        if (cancelRow) cancelRow.hidden = !!s.lifetime;
+        var adjust = el("acc-adjust");
+        if (adjust) adjust.hidden = !!s.lifetime;
 
         // Delete account is blocked while a personal subscription is still live
         // and billing (not yet set to cancel). The user must cancel first via
@@ -5961,6 +5975,24 @@
         el("acc-invite-form").hidden = !manager;
         el("acc-team-tabs").hidden = !manager;
         el("acc-team-owner-actions").hidden = t.my_role !== "owner";
+        // Lifetime teams have a fixed 5-seat allotment — no seat resizing.
+        var addSeats = el("acc-add-seats");
+        if (addSeats) addSeats.hidden = !!t.lifetime;
+
+        // Team lifetime: reflect the one-time plan on the Account card too
+        // (the owner has no personal subscription row to derive it from).
+        if (t.lifetime) {
+          el("acc-plan-name").textContent = "Team plan · Lifetime";
+          if (t.my_role === "owner") {
+            el("acc-plan-price").textContent = "$499";
+            el("acc-plan-per").textContent = "once";
+            el("acc-plan-renew").textContent = "Pay once, yours forever — 5 seats, every future transition included.";
+          } else {
+            el("acc-plan-renew").textContent = "Your seat is covered by your team's lifetime plan.";
+          }
+          var cr = el("acc-cancel-row"); if (cr) cr.hidden = true;
+          var aj = el("acc-adjust"); if (aj) aj.hidden = true;
+        }
 
         if (!manager) {
           // Member view: name + own membership only.
