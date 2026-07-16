@@ -40,8 +40,8 @@
   <meta property="og:locale" content="en_US" />
   <meta property="og:title" content="Transitions.dev — Essential transitions for web apps" />
   <meta property="og:description" content="Collection of the most essential transitions for web apps that you can just copy and paste into any project." />
-  <meta property="og:image" content="https://transitions.dev/assets/og-image.jpg" />
-  <meta property="og:image:secure_url" content="https://transitions.dev/assets/og-image.jpg" />
+  <meta property="og:image" content="https://transitions.dev/assets/og-main.jpg" />
+  <meta property="og:image:secure_url" content="https://transitions.dev/assets/og-main.jpg" />
   <meta property="og:image:type" content="image/jpeg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
@@ -50,7 +50,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Transitions.dev — Essential transitions for web apps" />
   <meta name="twitter:description" content="Collection of the most essential transitions for web apps that you can just copy and paste into any project." />
-  <meta name="twitter:image" content="https://transitions.dev/assets/og-image.jpg" />
+  <meta name="twitter:image" content="https://transitions.dev/assets/og-main.jpg" />
   <meta name="twitter:image:alt" content="Transitions.dev — Collection of the most essential transitions" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -96,7 +96,7 @@
           "inLanguage": "en",
           "primaryImageOfPage": {
             "@type": "ImageObject",
-            "url": "https://transitions.dev/assets/og-image.jpg",
+            "url": "https://transitions.dev/assets/og-main.jpg",
             "width": 1200,
             "height": 630
           }
@@ -4448,6 +4448,19 @@
       100% { translate: 0 0; }
     }
 
+    /* Touch targets — invisible >=16px hit-area expander so the small
+       controls (like button, checkbox, toggle) are comfortable to tap
+       on mobile without changing their visual size. The pseudo is a
+       child of each button, so tapping the padded area still triggers
+       the button. */
+    .p23-like::before,
+    .p25-box::before,
+    .p27-switch::before {
+      content: "";
+      position: absolute;
+      inset: -16px;
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .p22-toast,
       .p24-chevron,
@@ -5970,6 +5983,21 @@
         z-index: 30;
       }
     }
+    /* Touch devices have no hover, so the fan is tap-toggled: JS
+       flips .is-open (gated to (hover: none)); the transforms mirror
+       the hover rules exactly. */
+    .pro2-stack.is-open .pro2-card {
+      translate:
+        calc(var(--cx) + var(--dx) * var(--pro2-spread))
+        calc(var(--cy) + var(--dy));
+      rotate: calc(var(--rot) + var(--drot) * var(--pro2-rotation));
+      opacity: 1;
+      transition:
+        translate var(--pro2-open-dur) var(--pro2-open-ease),
+        rotate var(--pro2-open-dur) var(--pro2-open-ease),
+        scale var(--pro2-scale-dur) var(--pro2-scale-ease),
+        opacity var(--pro2-open-dur) var(--pro2-open-ease);
+    }
 
     /* ── PRO3 Organic shimmer ──────────────────────────────────── */
     .pro3-square {
@@ -6192,6 +6220,17 @@
       transition:
         scale var(--pro4-close-dur) var(--pro4-close-ease),
         border-radius var(--pro4-close-dur) var(--pro4-close-ease);
+    }
+    /* Touch devices: WebKit mis-renders the animated feImage +
+       feDisplacementMap bend there (skipped repaints leave the photo
+       warped mid-flight). Drop only the organic bend — the tilt +
+       spring open/close are pure GPU transforms and stay identical.
+       The JS bend driver is gated on the same media query. */
+    @media (hover: none) {
+      .pro4-card {
+        filter: none;
+        will-change: scale, transform;
+      }
     }
     .pro4-card.is-open {
       border-radius: 16px;
@@ -13901,12 +13940,29 @@ export function Surface({ open, children }) {
       })();
 
       /* ── PRO4 Image open tilt ────────────────────────────────── */
+      /* ── PRO2 Card stack: tap-to-fan on touch ─────────────────
+         The fan lives on :hover inside @media (hover: hover), so
+         touch devices never see it — tapping toggles .is-open
+         instead (same transforms; see the pro2 CSS). Gated so
+         desktop keeps pure hover behaviour. */
+      (function initPro2Touch() {
+        var stack = document.querySelector(".pro2-stack");
+        if (!stack) return;
+        if (!window.matchMedia || !window.matchMedia("(hover: none)").matches) return;
+        stack.addEventListener("click", function () {
+          stack.classList.toggle("is-open");
+        });
+      })();
+
       (function initPro4() {
         var card = document.getElementById("pro4-card");
         if (!card) return;
 
         var bendDisp = document.getElementById("pro4-bend-disp");
         var bendRaf = null;
+        // Touch devices drop the SVG bend entirely (see the pro4
+        // CSS @media (hover: none) rule) — skip the driver too.
+        var noBend = window.matchMedia && window.matchMedia("(hover: none)").matches;
 
         // Cubic-bezier sampler (Newton's method) for the bend envelope.
         function makeBendEase(raw) {
@@ -13947,7 +14003,7 @@ export function Surface({ open, children }) {
         }
 
         function runBend(sign, flightMs) {
-          if (!bendDisp || reduced) return;
+          if (!bendDisp || reduced || noBend) return;
           var explicit = readNum("--pro4-bend-dur", 0);
           var durMs = explicit > 0 ? explicit : flightMs;
           if (durMs <= 0) return;
