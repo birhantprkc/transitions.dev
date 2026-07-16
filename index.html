@@ -5551,23 +5551,33 @@
       transform-origin: center;
       scale: var(--pro4-closed-scale);
       transform: rotateX(0deg) rotateY(0deg) translateZ(0);
-      filter: url(#pro4-bend);
-      will-change: scale, transform, filter;
+      will-change: scale, transform;
       transition:
         scale var(--pro4-close-dur) var(--pro4-close-ease),
         border-radius var(--pro4-close-dur) var(--pro4-close-ease);
     }
-    /* Touch devices: WebKit mis-renders the animated feImage +
-       feDisplacementMap bend there (skipped repaints leave the photo
-       warped mid-flight). Drop only the organic bend — the tilt +
-       spring open/close are pure GPU transforms and stay identical.
-       The JS bend driver is gated on the same media query. */
-    @media (hover: none) {
-      .pro4-card {
-        filter: none;
-        will-change: scale, transform;
-      }
+    /* Bend render layer: JS draws the warped photo here during the
+       flight (see initPro4). Oversized via an inline inset so the
+       bow can travel outside the card box, like the old filter's
+       output region did. It inherits the card's scale/tilt, so the
+       3D flight applies to the bent image for free. */
+    .pro4-canvas {
+      position: absolute;
+      display: none;
+      pointer-events: none;
     }
+    /* While bending, the canvas IS the card's visual: unclip the
+       card (the rounded clip is baked into the warp itself and the
+       bow must escape the box) and hide the flat photo + background
+       so no straight-edged fill peeks out behind the bowed edges.
+       The box-shadow stays — soft enough that not bending it is
+       imperceptible, and it never flickers on/off this way. */
+    .pro4-card.is-bending {
+      overflow: visible;
+      background: transparent;
+    }
+    .pro4-card.is-bending .pro4-img { visibility: hidden; }
+    .pro4-card.is-bending .pro4-canvas { display: block; }
     .pro4-card.is-open {
       border-radius: 16px;
       scale: 1;
@@ -6803,20 +6813,15 @@
           <div class="stage-inner stage-inner--no-btn pro4-stage">
             <button type="button" class="pro4-card" id="pro4-card" aria-expanded="false" aria-label="Open image">
               <img class="pro4-img" id="pro4-photo" alt="" src="assets/proto-images/Untitled4.jpg" />
+              <!-- Bend render layer. The old feImage + feDisplacementMap
+                   filter never worked in WebKit (feImage data URIs don't
+                   load → no bend in Safari, broken repaints on iOS), so
+                   the bend is drawn here: a software displacement warp
+                   using the SAME map — 0.82 · blurred horizontal parabola
+                   + 0.18 · organic noise — with the rounded clip applied
+                   per pixel in source space so the outline bows too. -->
+              <canvas class="pro4-canvas" aria-hidden="true"></canvas>
             </button>
-            <svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
-              <filter id="pro4-bend" x="-25%" y="-45%" width="150%" height="190%" color-interpolation-filters="sRGB">
-                <feImage id="pro4-bend-map" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='320'%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='rgb(128,0,128)'/%3E%3Cstop offset='0.125' stop-color='rgb(128,56,128)'/%3E%3Cstop offset='0.25' stop-color='rgb(128,96,128)'/%3E%3Cstop offset='0.375' stop-color='rgb(128,120,128)'/%3E%3Cstop offset='0.5' stop-color='rgb(128,128,128)'/%3E%3Cstop offset='0.625' stop-color='rgb(128,120,128)'/%3E%3Cstop offset='0.75' stop-color='rgb(128,96,128)'/%3E%3Cstop offset='0.875' stop-color='rgb(128,56,128)'/%3E%3Cstop offset='1' stop-color='rgb(128,0,128)'/%3E%3C/linearGradient%3E%3Crect width='360' height='320' fill='url(%23g)'/%3E%3C/svg%3E"
-                  x="-44" y="-80" width="308" height="320" preserveAspectRatio="none" result="para" />
-                <feGaussianBlur in="para" stdDeviation="12" result="paraSoft" />
-                <feTurbulence type="fractalNoise" baseFrequency="0.009 0.014" numOctaves="2" seed="11" result="noiseRaw" />
-                <feComponentTransfer in="noiseRaw" result="noise">
-                  <feFuncA type="table" tableValues="1 1" />
-                </feComponentTransfer>
-                <feComposite in="paraSoft" in2="noise" operator="arithmetic" k1="0" k2="0.82" k3="0.18" k4="0" result="pro4map" />
-                <feDisplacementMap id="pro4-bend-disp" in="SourceGraphic" in2="pro4map" scale="0" xChannelSelector="R" yChannelSelector="G" />
-              </filter>
-            </svg>
           </div>
         </div>
         <div class="card-meta">
@@ -12503,11 +12508,151 @@ export function Surface({ open, children }) {
         var card = document.getElementById("pro4-card");
         if (!card) return;
 
-        var bendDisp = document.getElementById("pro4-bend-disp");
+        // Bend: a software displacement warp drawn on the .pro4-canvas
+        // layer (the old feImage/feDisplacementMap filter never worked
+        // in WebKit — no bend in Safari at all). The FIELD is the exact
+        // map the filter built (0.82 · parabola + 0.18 · noise, channels
+        // − 0.5), scaled by strength · sign · sin(π·ease(p)) per frame.
+        var img = card.querySelector(".pro4-img");
+        var canvas = card.querySelector(".pro4-canvas");
+        var cctx = canvas ? canvas.getContext("2d") : null;
         var bendRaf = null;
-        // Touch devices drop the SVG bend entirely (see the pro4
-        // CSS @media (hover: none) rule) — skip the driver too.
-        var noBend = window.matchMedia && window.matchMedia("(hover: none)").matches;
+
+        var dprB = Math.min(window.devicePixelRatio || 1, 2);
+        // Deterministic 2-octave value noise — stands in for the old
+        // feTurbulence (seed 11; ~110/70px wavelengths match its
+        // 0.009/0.014 base frequency).
+        var NB = 64;
+        var bnR = new Float32Array(NB * NB);
+        var bnG = new Float32Array(NB * NB);
+        (function seedBend() {
+          var s = 11;
+          for (var i = 0; i < NB * NB; i++) {
+            s = (s * 1664525 + 1013904223) >>> 0;
+            bnR[i] = s / 2147483648 - 1;
+            s = (s * 1664525 + 1013904223) >>> 0;
+            bnG[i] = s / 2147483648 - 1;
+          }
+        })();
+        function bGrid(g, x, y) {
+          var xi = Math.floor(x), yi = Math.floor(y);
+          var fx = x - xi, fy = y - yi;
+          fx = fx * fx * (3 - 2 * fx);
+          fy = fy * fy * (3 - 2 * fy);
+          var x0 = ((xi % NB) + NB) % NB, x1 = (x0 + 1) % NB;
+          var y0 = ((yi % NB) + NB) % NB, y1 = (y0 + 1) % NB;
+          var top = g[y0 * NB + x0] + (g[y0 * NB + x1] - g[y0 * NB + x0]) * fx;
+          var bot = g[y1 * NB + x0] + (g[y1 * NB + x1] - g[y1 * NB + x0]) * fx;
+          return top + (bot - top) * fy;
+        }
+        function bNoise(g, px, py) {
+          return (bGrid(g, px / 110, py / 70) +
+                  0.5 * bGrid(g, px / 55 + 37.7, py / 35 + 11.3)) / 1.5;
+        }
+
+        // Per-run state: unclipped photo snapshot + the displacement
+        // field (per unit strength) on a coarse lattice — the field
+        // is ultra-smooth, so 8-device-px cells lose nothing.
+        var LATB = 8;
+        var snapData = null, outData = null;
+        var latFX = null, latFY = null, latWB = 0, latHB = 0;
+        var padB = 0, padDevB = 0, sw = 0, sh = 0;
+
+        function prepareBend(strength) {
+          var cw = card.offsetWidth, chh = card.offsetHeight;
+          sw = Math.max(2, Math.round(cw * dprB));
+          sh = Math.max(2, Math.round(chh * dprB));
+          // Max |displacement| ≈ 0.30 · strength (parabola + noise).
+          padB = Math.ceil(Math.abs(strength) * 0.32) + 4;
+          padDevB = Math.round(padB * dprB);
+          canvas.style.inset = -padB + "px";
+          canvas.width = sw + padDevB * 2;
+          canvas.height = sh + padDevB * 2;
+          outData = cctx.createImageData(canvas.width, canvas.height);
+          // Snapshot the cover-cropped photo UNCLIPPED — the rounded
+          // clip is applied per pixel during the warp so it bends.
+          var sc = document.createElement("canvas");
+          sc.width = sw;
+          sc.height = sh;
+          var scx = sc.getContext("2d");
+          if (img && img.naturalWidth) {
+            var k = Math.max(sw / img.naturalWidth, sh / img.naturalHeight);
+            var dw = img.naturalWidth * k, dh = img.naturalHeight * k;
+            scx.drawImage(img, (sw - dw) / 2, (sh - dh) / 2, dw, dh);
+          }
+          snapData = scx.getImageData(0, 0, sw, sh).data;
+          latWB = Math.ceil(canvas.width / LATB) + 2;
+          latHB = Math.ceil(canvas.height / LATB) + 2;
+          latFX = new Float32Array(latWB * latHB);
+          latFY = new Float32Array(latWB * latHB);
+          for (var ly = 0; ly < latHB; ly++) {
+            var py = (ly * LATB - padDevB) / dprB;
+            for (var lx = 0; lx < latWB; lx++) {
+              var px = (lx * LATB - padDevB) / dprB;
+              var q = (2 * px - cw) / (1.4 * cw);
+              var li = ly * latWB + lx;
+              latFX[li] = 0.0016 + 0.09 * bNoise(bnR, px, py);
+              latFY[li] = 0.4116 * (1 - q * q) - 0.41 + 0.09 * bNoise(bnG, px, py);
+            }
+          }
+        }
+
+        function renderBend(s) {
+          // Radius LIVE from the animating style so the 32↔16px
+          // flight transition keeps rendering during the bend.
+          var rr = (parseFloat(getComputedStyle(card).borderTopLeftRadius) || 0) * dprB;
+          var W = canvas.width, H = canvas.height;
+          var src = snapData, dst = outData.data;
+          var sDev = s * dprB;
+          var invLat = 1 / LATB;
+          var di = 0;
+          for (var y = 0; y < H; y++) {
+            var gy = y * invLat, gy0 = gy | 0, fyL = gy - gy0;
+            var row0 = gy0 * latWB, row1 = row0 + latWB;
+            for (var x = 0; x < W; x++, di += 4) {
+              var gx = x * invLat, gx0 = gx | 0, fxL = gx - gx0;
+              var a = row0 + gx0, b = row1 + gx0;
+              var Fx = (latFX[a] + (latFX[a + 1] - latFX[a]) * fxL) * (1 - fyL) +
+                       (latFX[b] + (latFX[b + 1] - latFX[b]) * fxL) * fyL;
+              var Fy = (latFY[a] + (latFY[a + 1] - latFY[a]) * fxL) * (1 - fyL) +
+                       (latFY[b] + (latFY[b + 1] - latFY[b]) * fxL) * fyL;
+              var sxf = x - padDevB + sDev * Fx;
+              var syf = y - padDevB + sDev * Fy;
+              // Rounded-rect coverage at the SOURCE point (the
+              // outline itself bends), 1px antialiased edge.
+              var dx1 = Math.min(sxf, sw - sxf);
+              var dy1 = Math.min(syf, sh - syf);
+              var d;
+              if (dx1 < rr && dy1 < rr) {
+                var ax = rr - dx1, ay = rr - dy1;
+                d = rr - Math.sqrt(ax * ax + ay * ay);
+              } else {
+                d = Math.min(dx1, dy1);
+              }
+              if (d <= 0) {
+                dst[di + 3] = 0;
+                continue;
+              }
+              // Bilinear photo fetch (clamped — the photo fills the box).
+              var sx0 = Math.floor(sxf), sy0 = Math.floor(syf);
+              if (sx0 < 0) sx0 = 0; else if (sx0 > sw - 2) sx0 = sw - 2;
+              if (sy0 < 0) sy0 = 0; else if (sy0 > sh - 2) sy0 = sh - 2;
+              var u = Math.min(Math.max(sxf - sx0, 0), 1);
+              var v = Math.min(Math.max(syf - sy0, 0), 1);
+              var w00 = (1 - u) * (1 - v), w10 = u * (1 - v);
+              var w01 = (1 - u) * v, w11 = u * v;
+              var i00 = (sy0 * sw + sx0) * 4;
+              var i10 = i00 + 4;
+              var i01 = i00 + sw * 4;
+              var i11 = i01 + 4;
+              dst[di] = src[i00] * w00 + src[i10] * w10 + src[i01] * w01 + src[i11] * w11;
+              dst[di + 1] = src[i00 + 1] * w00 + src[i10 + 1] * w10 + src[i01 + 1] * w01 + src[i11 + 1] * w11;
+              dst[di + 2] = src[i00 + 2] * w00 + src[i10 + 2] * w10 + src[i01 + 2] * w01 + src[i11 + 2] * w11;
+              dst[di + 3] = d >= 1 ? 255 : 255 * d;
+            }
+          }
+          cctx.putImageData(outData, 0, 0);
+        }
 
         // Cubic-bezier sampler (Newton's method) for the bend envelope.
         function makeBendEase(raw) {
@@ -12548,34 +12693,27 @@ export function Surface({ open, children }) {
         }
 
         function runBend(sign, flightMs) {
-          if (!bendDisp || reduced || noBend) return;
+          if (!canvas || !cctx || reduced) return;
+          var strength = readNum("--pro4-bend", 0);
+          if (!strength) return;
           var explicit = readNum("--pro4-bend-dur", 0);
           var durMs = explicit > 0 ? explicit : flightMs;
           if (durMs <= 0) return;
-          var strength = readNum("--pro4-bend", 0);
           var ease = makeBendEase(readStr("--pro4-bend-ease"));
-          // Re-fit the parabola map to the card's current layout box so
-          // the bow stays centered whatever the open size.
-          var bendMap = document.getElementById("pro4-bend-map");
-          if (bendMap) {
-            var w = card.offsetWidth, h = card.offsetHeight;
-            bendMap.setAttribute("x", (-0.2 * w).toFixed(1));
-            bendMap.setAttribute("y", (-0.5 * h).toFixed(1));
-            bendMap.setAttribute("width", (1.4 * w).toFixed(1));
-            bendMap.setAttribute("height", (2 * h).toFixed(1));
-          }
           if (bendRaf) cancelAnimationFrame(bendRaf);
+          prepareBend(strength);
+          card.classList.add("is-bending");
           var t0 = performance.now();
           (function tick(now) {
             var p = Math.min((now - t0) / durMs, 1);
             var e = Math.min(Math.max(ease(p), 0), 1);
             var env = Math.sin(Math.PI * e);
-            bendDisp.scale.baseVal = strength * sign * env;
+            renderBend(strength * sign * env);
             if (p < 1) {
               bendRaf = requestAnimationFrame(tick);
             } else {
-              bendDisp.scale.baseVal = 0;
               bendRaf = null;
+              card.classList.remove("is-bending");
             }
           })(t0);
         }
