@@ -4653,5 +4653,241 @@
       });
     });
   </script>
+
+  <!-- Celebration confetti: bursts once on load. Pieces spawn across the
+       hero title's width, fall through the full viewport, and only the
+       primary CTA pill is a physical surface — everything else falls
+       straight through and off-screen. -->
+  <canvas id="sx-confetti" aria-hidden="true"></canvas>
+  <style>
+    #sx-confetti {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 90;
+      pointer-events: none;
+    }
+  </style>
+  <script>
+  (function () {
+    var canvas = document.getElementById("sx-confetti");
+    var title = document.querySelector(".header .title");
+    var cta = document.querySelector(".skill-cta-row .skill-btn--primary");
+    var cta2 = document.querySelector(".skill-cta-row .skill-btn--secondary");
+    var iconWrap = document.querySelector(".header-icon-wrap");
+    if (!canvas || !title || !cta) return;
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    var ctx = canvas.getContext("2d");
+    var COLORS = [
+      "#ff4d67", "#ffb020", "#3b82f6", "#22c55e",
+      "#a855f7", "#f97316", "#06b6d4", "#f43f5e"
+    ];
+    var COUNT = 120, SIZE = 8, GRAVITY = 1300, SWAY = 16, RESTITUTION = 0.3;
+    var HOLD = 1600, FADE = 600;
+    /* The icon <img> is 136×140 but the visible rounded-square badge sits
+       inset inside it (transparent padding). Fractions measured from the
+       opaque bounding box of the icon PNG. */
+    var ICON_INSET = { l: 0.324, r: 0.324, t: 0.307, b: 0.354 };
+    var particles = [];
+    var running = false;
+    var lastT = 0;
+    var burstEnd = 0;
+    var fadeStart = null;
+    var vw = 0, vh = 0;
+
+    function sizeCanvas() {
+      var dpr = window.devicePixelRatio || 1;
+      vw = window.innerWidth;
+      vh = window.innerHeight;
+      canvas.width = Math.round(vw * dpr);
+      canvas.height = Math.round(vh * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    /* The physical surfaces: both CTA pills (r = half-height, so they're
+       fully rounded) and the square logo badge (r = a small corner
+       radius). Recomputed each frame so the sim tracks live layout. */
+    function getSurfaces() {
+      var out = [];
+      [cta, cta2].forEach(function (el) {
+        if (!el) return;
+        var b = el.getBoundingClientRect();
+        out.push({ left: b.left, top: b.top, right: b.right, bottom: b.bottom, r: (b.bottom - b.top) / 2 });
+      });
+      if (iconWrap) {
+        var w = iconWrap.getBoundingClientRect();
+        var il = w.left + w.width * ICON_INSET.l;
+        var ir = w.right - w.width * ICON_INSET.r;
+        var it = w.top + w.height * ICON_INSET.t;
+        var ib = w.bottom - w.height * ICON_INSET.b;
+        out.push({ left: il, top: it, right: ir, bottom: ib, r: Math.min(ir - il, ib - it) * 0.26 });
+      }
+      return out;
+    }
+    /* Rounded-rect top surface: flat between the corner-arc centers,
+       quarter-circle shoulders outside them. r = b.r (half-height for a
+       pill, corner radius for the square). */
+    function surfaceTop(x, b) {
+      if (x < b.left || x > b.right) return null;
+      var r = b.r;
+      var lc = b.left + r;
+      var rc = b.right - r;
+      if (x >= lc && x <= rc) return { y: b.top, slope: 0 };
+      var cx = x < lc ? lc : rc;
+      var dx = x - cx;
+      var root = Math.sqrt(Math.max(r * r - dx * dx, 0));
+      return { y: b.top + (r - root), slope: dx / Math.max(root, 0.001) };
+    }
+    function burst() {
+      sizeCanvas();
+      var t = title.getBoundingClientRect();
+      var spawnLeft = t.left;
+      var spawnW = Math.max(t.width, 240);
+      var now = performance.now();
+      var spawnWindow = 500;
+      particles = [];
+      fadeStart = null;
+      for (var i = 0; i < COUNT; i++) {
+        particles.push({
+          start: now + Math.random() * spawnWindow,
+          x: spawnLeft + Math.random() * spawnW,
+          y: -12 - Math.random() * 30,
+          py: -12,
+          vx: (Math.random() - 0.5) * 60,
+          vy: 40 + Math.random() * 120,
+          w: SIZE * (0.7 + Math.random() * 0.6),
+          h: SIZE * (0.5 + Math.random() * 0.5),
+          maxFall: 420 + Math.random() * 280,
+          rot: Math.random() * Math.PI,
+          vr: (Math.random() - 0.5) * 7,
+          tumble: Math.random() * Math.PI * 2,
+          tumbleSpeed: 4 + Math.random() * 8,
+          squish: 1,
+          phase: Math.random() * Math.PI * 2,
+          swayFreq: 2 + Math.random() * 3,
+          swayScale: 0.5 + Math.random(),
+          color: COLORS[Math.floor(Math.random() * COLORS.length)],
+          bounces: 0,
+          resting: false,
+          dead: false
+        });
+      }
+      burstEnd = now + spawnWindow + 100;
+      if (!running) {
+        running = true;
+        lastT = now;
+        requestAnimationFrame(frame);
+      }
+    }
+    function step(dt, now) {
+      var surfaces = getSurfaces();
+      for (var i = 0; i < particles.length; i++) {
+        var p = particles[i];
+        if (p.resting || p.dead || now < p.start) continue;
+        p.py = p.y;
+        p.vy += GRAVITY * dt;
+        if (p.vy > p.maxFall) p.vy = p.maxFall;
+        p.phase += p.swayFreq * dt;
+        p.x += (p.vx + Math.cos(p.phase) * SWAY * p.swayScale) * dt;
+        p.y += p.vy * dt;
+        p.rot += p.vr * dt;
+        p.tumble += p.tumbleSpeed * dt;
+        p.squish = 0.25 + 0.75 * Math.abs(Math.cos(p.tumble));
+        var half = p.h / 2;
+        /* Hard surfaces: the two CTA pills + the square logo badge.
+           Land on whichever the piece crosses first (topmost). */
+        if (p.vy > 0) {
+          var hit = null, hb = null;
+          for (var si = 0; si < surfaces.length; si++) {
+            var b = surfaces[si];
+            var s = surfaceTop(p.x, b);
+            if (s && p.y + half >= s.y && p.py + half <= s.y + 2) {
+              if (!hit || s.y < hit.y) { hit = s; hb = b; }
+            }
+          }
+          if (hit) {
+            if (Math.abs(hit.slope) > 0.85) {
+              var dir = p.x < (hb.left + hb.right) / 2 ? -1 : 1;
+              p.vx = dir * Math.max(Math.abs(p.vx), 50 + Math.random() * 50);
+              p.vy *= 0.35;
+              p.y = hit.y - half;
+            } else if (p.vy > 150 && p.bounces < 2) {
+              p.bounces++;
+              p.vy = -p.vy * RESTITUTION * (0.6 + Math.random() * 0.5);
+              p.vx = p.vx * 0.7 + hit.slope * 40 + (Math.random() - 0.5) * 40;
+              p.y = hit.y - half;
+            } else {
+              p.resting = true;
+              p.y = hit.y - half - 0.5;
+              p.vx = 0;
+              p.vy = 0;
+            }
+          }
+        }
+        /* No floor: anything that misses every surface falls off-screen. */
+        if (p.x < -30 || p.x > vw + 30 || p.y > vh + 30) {
+          p.dead = true;
+        }
+      }
+    }
+    function draw(alpha) {
+      ctx.clearRect(0, 0, vw, vh);
+      ctx.globalAlpha = alpha;
+      var now = performance.now();
+      for (var i = 0; i < particles.length; i++) {
+        var p = particles[i];
+        if (p.dead || now < p.start) continue;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.scale(1, p.squish);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    }
+    function frame(now) {
+      if (!running) return;
+      var remaining = Math.min((now - lastT) / 1000, 0.25);
+      lastT = now;
+      while (remaining > 0) {
+        var dt = Math.min(remaining, 1 / 60);
+        step(dt, now);
+        remaining -= dt;
+      }
+      var settled = now > burstEnd;
+      if (settled) {
+        for (var i = 0; i < particles.length; i++) {
+          if (!particles[i].resting && !particles[i].dead) { settled = false; break; }
+        }
+      }
+      if (settled && fadeStart === null) {
+        fadeStart = now + HOLD;
+      }
+      var alpha = 1;
+      if (fadeStart !== null && now >= fadeStart) {
+        alpha = 1 - (now - fadeStart) / FADE;
+        if (alpha <= 0) {
+          running = false;
+          particles = [];
+          ctx.clearRect(0, 0, vw, vh);
+          return;
+        }
+      }
+      draw(alpha);
+      requestAnimationFrame(frame);
+    }
+    window.addEventListener("resize", function () {
+      if (running) sizeCanvas();
+    });
+    /* One celebratory burst once fonts/layout have settled. */
+    if (document.readyState === "complete") {
+      setTimeout(burst, 350);
+    } else {
+      window.addEventListener("load", function () { setTimeout(burst, 350); });
+    }
+  })();
+  </script>
 </body>
 </html>
