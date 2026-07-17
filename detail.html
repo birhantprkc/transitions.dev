@@ -5536,7 +5536,12 @@
       overflow-wrap: anywhere;
     }
     html[data-theme="dark"] .skill-code-row code { color: #d6d6d6; }
+    /* Inline command copy — reuses the .card-copy component (animated
+       icon swap + Copy code / Copied tooltip); these rules just re-flow
+       it inline in the code row instead of the card's absolute corner. */
     .skill-code-copy {
+      position: relative;
+      inset: auto;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -5547,6 +5552,8 @@
       border: none;
       border-radius: 6px;
       background: transparent;
+      background-image: none;
+      box-shadow: none;
       color: var(--text-muted);
       cursor: pointer;
       transition: background 140ms ease, color 140ms ease;
@@ -5554,9 +5561,6 @@
     .skill-code-copy:hover { background: rgba(0, 0, 0, 0.04); color: var(--text); }
     html[data-theme="dark"] .skill-code-copy:hover { background: rgba(255, 255, 255, 0.06); }
     .skill-code-copy svg { width: 15px; height: 15px; }
-    .skill-code-copy .icon-check { display: none; }
-    .skill-code-copy[data-copied="true"] .icon-copy { display: none; }
-    .skill-code-copy[data-copied="true"] .icon-check { display: inline-block; color: #12b76a; }
 
     /* Inline links inside doc copy — same treatment as the hero's
        "skill" link (.subtitle-skill): text color, no blue, underline
@@ -5764,6 +5768,7 @@
       position: absolute;
       top: 14px;
       right: 14px;
+      bottom: auto;
       width: 32px;
       height: 32px;
       display: inline-flex;
@@ -5772,15 +5777,17 @@
       border: none;
       border-radius: 9px;
       background: var(--chip-bg);
+      background-image: none;
+      box-shadow: none;
       color: var(--text-muted);
       cursor: pointer;
       transition: background 140ms ease, color 140ms ease;
     }
     .detail-code-copy:hover { background: var(--chip-bg-hover); color: var(--text); }
     .detail-code-copy svg { width: 15px; height: 15px; }
-    .detail-code-copy .icon-check { display: none; }
-    .detail-code-copy[data-copied="true"] .icon-copy { display: none; }
-    .detail-code-copy[data-copied="true"] .icon-check { display: inline-block; color: #12b76a; }
+    /* This button sits at the panel's top edge, so drop its tooltip below
+       (the card tooltip defaults to pointing up). */
+    .detail-code-copy .card-copy-tooltip { top: calc(100% + 8px); bottom: auto; }
 
     /* ── Responsive ──────────────────────────────────────────── */
     @media (max-width: 860px) {
@@ -6022,7 +6029,7 @@
 
           <div class="detail-panel" data-detail-panel="css" hidden>
             <div class="detail-code">
-              <button type="button" class="detail-code-copy" data-copy-target="css" aria-label="Copy CSS">
+              <button type="button" class="detail-code-copy card-copy" data-copy-target="css" aria-label="Copy CSS">
                 <svg class="icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               </button>
@@ -6032,7 +6039,7 @@
 
           <div class="detail-panel" data-detail-panel="react" hidden>
             <div class="detail-code">
-              <button type="button" class="detail-code-copy" data-copy-target="react" aria-label="Copy React">
+              <button type="button" class="detail-code-copy card-copy" data-copy-target="react" aria-label="Copy React">
                 <svg class="icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               </button>
@@ -6064,7 +6071,7 @@
                 <span class="skill-command-label">Free version</span>
                 <div class="skill-code-row">
                   <code id="cli-add-all-cmd">npx transitions-pro add --all</code>
-                  <button type="button" class="skill-code-copy" aria-label="Copy CLI add-all command" data-copy-target="#cli-add-all-cmd">
+                  <button type="button" class="skill-code-copy card-copy" aria-label="Copy CLI add-all command" data-copy-target="#cli-add-all-cmd">
                     <svg class="icon-copy" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     <svg class="icon-check" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                   </button>
@@ -6075,7 +6082,7 @@
                 <span class="skill-command-label">Pro version</span>
                 <div class="skill-code-row">
                   <code id="cli-add-pro-cmd">npx transitions-pro add --pro</code>
-                  <button type="button" class="skill-code-copy" aria-label="Copy CLI add-pro command" data-copy-target="#cli-add-pro-cmd">
+                  <button type="button" class="skill-code-copy card-copy" aria-label="Copy CLI add-pro command" data-copy-target="#cli-add-pro-cmd">
                     <svg class="icon-copy" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     <svg class="icon-check" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                   </button>
@@ -6090,7 +6097,7 @@
                 <span class="skill-command-label">Free version</span>
                 <div class="skill-code-row">
                   <code id="install-cmd">npx skills add Jakubantalik/transitions.dev</code>
-                  <button type="button" class="skill-code-copy" aria-label="Copy install command" data-copy-target="#install-cmd">
+                  <button type="button" class="skill-code-copy card-copy" aria-label="Copy install command" data-copy-target="#install-cmd">
                     <svg class="icon-copy" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     <svg class="icon-check" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                   </button>
@@ -6101,7 +6108,7 @@
                 <span class="skill-command-label">Pro version</span>
                 <div class="skill-code-row">
                   <code id="cli-skill-cmd">npx transitions-pro skill</code>
-                  <button type="button" class="skill-code-copy" aria-label="Copy Pro skill install command" data-copy-target="#cli-skill-cmd">
+                  <button type="button" class="skill-code-copy card-copy" aria-label="Copy Pro skill install command" data-copy-target="#cli-skill-cmd">
                     <svg class="icon-copy" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     <svg class="icon-check" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                   </button>
@@ -6112,7 +6119,7 @@
                 <span class="skill-command-label">Free &amp; Pro version</span>
                 <div class="skill-code-row">
                   <code id="refine-cmd">npx transitions-refine live</code>
-                  <button type="button" class="skill-code-copy" aria-label="Copy Refine tool command" data-copy-target="#refine-cmd">
+                  <button type="button" class="skill-code-copy card-copy" aria-label="Copy Refine tool command" data-copy-target="#refine-cmd">
                     <svg class="icon-copy" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     <svg class="icon-check" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                   </button>
@@ -11511,7 +11518,12 @@ export function Surface({ open, children }) {
                 var text = target === "react" ? reactEl.textContent : cssEl.textContent;
                 var done = function () {
                   btn.setAttribute("data-copied", "true");
-                  window.setTimeout(function () { btn.removeAttribute("data-copied"); }, 1600);
+                  var swap = btn.querySelector(".tt-swap");
+                  if (swap) swap.setAttribute("data-state", "copied");
+                  window.setTimeout(function () {
+                    btn.removeAttribute("data-copied");
+                    window.setTimeout(function () { if (swap) swap.setAttribute("data-state", "copy"); }, 200);
+                  }, 1600);
                 };
                 if (navigator.clipboard && navigator.clipboard.writeText) {
                   navigator.clipboard.writeText(text).then(done).catch(done);
@@ -11533,7 +11545,12 @@ export function Surface({ open, children }) {
                 var text = targetEl.textContent;
                 var done = function () {
                   btn.setAttribute("data-copied", "true");
-                  window.setTimeout(function () { btn.removeAttribute("data-copied"); }, 1600);
+                  var swap = btn.querySelector(".tt-swap");
+                  if (swap) swap.setAttribute("data-state", "copied");
+                  window.setTimeout(function () {
+                    btn.removeAttribute("data-copied");
+                    window.setTimeout(function () { if (swap) swap.setAttribute("data-state", "copy"); }, 200);
+                  }, 1600);
                 };
                 if (navigator.clipboard && navigator.clipboard.writeText) {
                   navigator.clipboard.writeText(text).then(done).catch(done);
