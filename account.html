@@ -5847,7 +5847,7 @@
     })();
   </script>
   <!-- Pro platform client: wires Get access / Sign in / account state to the API. -->
-  <script src="assets/pro-client.js?v=12" defer></script>
+  <script src="assets/pro-client.js?v=13" defer></script>
   <script>
     document.addEventListener("DOMContentLoaded", function () {
       var TP = window.TransitionsPro;
@@ -5899,7 +5899,10 @@
 
       function paint(s) {
         var authed = !!(s && s.authenticated);
-        el("acc-signedout").hidden = authed;
+        // Only claim "signed out" once /me has actually answered — while auth
+        // is still resolving (or the check failed transiently), show neither
+        // the gate nor the tabs rather than flashing a wrong signed-out card.
+        el("acc-signedout").hidden = !(s && s.resolved && !authed);
         if (!authed) {
           if (tabs.account) tabs.account.hidden = true;
           if (tabs.downloads) tabs.downloads.hidden = true;

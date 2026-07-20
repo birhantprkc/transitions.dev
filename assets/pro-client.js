@@ -27,7 +27,10 @@
     }).then(function (r) { return r.json().catch(function () { return {}; }); });
   }
 
-  var state = { authenticated: false, email: null, pro: false, subscription: null, ppp: null };
+  // `resolved` flips true only once /me has actually ANSWERED (2xx JSON) —
+  // pages must not present a definitive "signed out" UI before that, or a
+  // transient fetch failure paints a signed-in user as logged out.
+  var state = { authenticated: false, email: null, pro: false, subscription: null, ppp: null, resolved: false };
 
   function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : s; return d.innerHTML; }
 
@@ -78,17 +81,50 @@
     slot.hidden = false;
   }
 
-  function refreshMe() {
-    return apiJSON("/me").then(function (me) {
-      state.authenticated = !!me.authenticated;
-      state.email = me.email || null;
-      state.pro = !!(me.entitlements && me.entitlements.pro);
-      state.subscription = me.subscription || null;
-      paintAuth();
-      document.dispatchEvent(new CustomEvent("pro:me", { detail: state }));
-      return state;
-    }).catch(function () { return state; });
+  // /me is the auth authority. Only a 2xx JSON answer may update the state —
+  // a network failure or 5xx must NOT flip a signed-in user to signed out
+  // (Chrome tab freezing / bfcache restores made that happen intermittently).
+  // Transient failures retry with backoff before giving up quietly.
+  function refreshMe(attempt) {
+    attempt = attempt || 0;
+    return api("/me")
+      .then(function (r) {
+        if (!r.ok) throw new Error("me_" + r.status);
+        return r.json();
+      })
+      .then(function (me) {
+        state.authenticated = !!me.authenticated;
+        state.email = me.email || null;
+        state.pro = !!(me.entitlements && me.entitlements.pro);
+        state.lifetime = !!me.lifetime;
+        state.subscription = me.subscription || null;
+        state.resolved = true;
+        paintAuth();
+        document.dispatchEvent(new CustomEvent("pro:me", { detail: state }));
+        return state;
+      })
+      .catch(function () {
+        if (attempt < 2) {
+          return new Promise(function (res) {
+            setTimeout(function () { res(refreshMe(attempt + 1)); }, attempt === 0 ? 600 : 2000);
+          });
+        }
+        // Give up for now — state stays unresolved; pages keep whatever they
+        // last knew instead of claiming the user is signed out.
+        document.dispatchEvent(new CustomEvent("pro:me", { detail: state }));
+        return state;
+      });
   }
+
+  // Re-verify after bfcache restores and tab un-freezes — Chrome resumes the
+  // page without re-running scripts, and a pre-freeze failure would otherwise
+  // stick until a manual reload.
+  window.addEventListener("pageshow", function (e) {
+    if (e.persisted) refreshMe();
+  });
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible" && !state.resolved) refreshMe();
+  });
 
   // Sign out (this device, or ?all=1 for every device), then refresh state.
   function logout(allDevices) {
